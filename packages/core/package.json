@@ -1,0 +1,20 @@
+{
+  "name": "@watchtower/core",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "minimatch": "^10.0.3",
+    "uuid": "^13.0.0"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "watchtower",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b tsconfig.json",
+    "dev:runner": "npm run dev --workspace @watchtower/runner",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
