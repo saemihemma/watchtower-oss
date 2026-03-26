@@ -10,6 +10,7 @@ import {
   type ComparisonRun,
   type ComparisonScenario,
   type Executor,
+  type IRTCalibrationReport,
   type ReplaceResult,
   SCHEMA_VERSION
 } from "./schemas.js";
@@ -26,6 +27,8 @@ export type CompareLibrariesRunInput = {
   dataRoot: string;
   executor: Executor;
   updateElo?: boolean;
+  /** Optional IRT calibration report. When provided, IRT weights are applied to the scorecard. */
+  irtCalibration?: IRTCalibrationReport;
 };
 
 export type ShowRunResult = {
@@ -39,6 +42,8 @@ type DataPaths = {
   runsRoot: string;
   reportsRoot: string;
   archivesRoot: string;
+  batchesRoot: string;
+  calibrationsRoot: string;
 };
 
 export function getDataPaths(dataRoot: string): DataPaths {
@@ -47,7 +52,9 @@ export function getDataPaths(dataRoot: string): DataPaths {
     snapshotsRoot: path.join(dataRoot, "snapshots"),
     runsRoot: path.join(dataRoot, "runs"),
     reportsRoot: path.join(dataRoot, "reports"),
-    archivesRoot: path.join(dataRoot, "archives")
+    archivesRoot: path.join(dataRoot, "archives"),
+    batchesRoot: path.join(dataRoot, "batches"),
+    calibrationsRoot: path.join(dataRoot, "calibrations")
   };
 }
 
@@ -105,6 +112,33 @@ export function renderRunReport(run: ComparisonRun): string {
     }
   }
 
+  // Per-task detail table
+  const taskDetailLines: string[] = [];
+  if (run.task_side_summaries && run.task_side_summaries.length > 0) {
+    const taskIds = [...new Set(run.task_side_summaries.map((s) => s.task_id))];
+    const summaryMap = new Map(run.task_side_summaries.map((s) => [`${s.task_id}:${s.side_id}`, s]));
+    taskDetailLines.push(
+      "",
+      "## Per-Task Detail",
+      "| Task | Category | Left | Right | Delta | Trials (L/R) |",
+      "|------|----------|------|-------|-------|--------------|"
+    );
+    for (const taskId of taskIds) {
+      const leftSummary = summaryMap.get(`${taskId}:left`);
+      const rightSummary = summaryMap.get(`${taskId}:right`);
+      const leftScore = leftSummary?.task_score;
+      const rightScore = rightSummary?.task_score;
+      const leftStr = leftScore === null || leftScore === undefined ? "n/a" : (leftScore * 100).toFixed(1);
+      const rightStr = rightScore === null || rightScore === undefined ? "n/a" : (rightScore * 100).toFixed(1);
+      const deltaStr =
+        leftScore != null && rightScore != null ? ((rightScore - leftScore) * 100).toFixed(1) : "n/a";
+      const category =
+        run.scorecard.category_scores.find((c) => c.task_ids.includes(taskId))?.category ?? "unknown";
+      const trialsStr = `${leftSummary?.valid_trial_count ?? 0}/${rightSummary?.valid_trial_count ?? 0}`;
+      taskDetailLines.push(`| ${taskId} | ${category} | ${leftStr} | ${rightStr} | ${deltaStr} | ${trialsStr} |`);
+    }
+  }
+
   return [
     `# Watchtower Benchmark Run ${run.run_id}`,
     "",
@@ -112,8 +146,8 @@ export function renderRunReport(run: ComparisonRun): string {
     `- Winner: ${winnerLine}`,
     `- Comparison mode: ${run.comparison_mode}`,
     ...(scenarioLine ? [scenarioLine] : []),
-    `- Left: ${run.left_side.label} (${run.left_side.root_path})`,
-    `- Right: ${run.right_side.label} (${run.right_side.root_path})`,
+    `- Left: ${run.left_side.label} (${run.left_side.source_kind}: ${run.left_side.root_path})`,
+    `- Right: ${run.right_side.label} (${run.right_side.source_kind}: ${run.right_side.root_path})`,
     `- Left score: ${run.scorecard.left_score.toFixed(2)}`,
     `- Right score: ${run.scorecard.right_score.toFixed(2)}`,
     `- Delta: ${run.scorecard.delta.toFixed(2)}`,
@@ -123,11 +157,13 @@ export function renderRunReport(run: ComparisonRun): string {
     "",
     "## Category Breakdown",
     ...categoryLines,
+    ...taskDetailLines,
     "",
     renderReasons("Top Reasons", run.scorecard.top_reasons).trimEnd(),
     "",
     renderReasons("Regressions", run.scorecard.regressions).trimEnd(),
     ...v2Section,
+    ...renderCompositionAnalysis(run),
     "",
     "## Devil's Advocate",
     `- Verdict: ${run.devils_advocate.verdict}`,
@@ -137,6 +173,48 @@ export function renderRunReport(run: ComparisonRun): string {
     allowedActions,
     ""
   ].join("\n");
+}
+
+/**
+ * Render composition analysis section for the markdown report.
+ * Returns an array of lines (empty if no composition analysis present).
+ */
+function renderCompositionAnalysis(run: ComparisonRun): string[] {
+  const ca = run.composition_analysis;
+  if (!ca) return [];
+
+  const lines: string[] = ["", "## Composition Analysis"];
+
+  if (ca.insufficient_data) {
+    lines.push(
+      "Insufficient data (fewer than 2 scored tasks per layer). Run more trials or add composition tasks."
+    );
+    return lines;
+  }
+
+  lines.push(
+    `- **Collapse detected:** ${ca.detected ? "Yes" : "No"}`,
+    `- **Severity:** ${ca.severity.toFixed(4)} (scale: 0 = none, 1 = total)`,
+    "",
+    "| Layer | Mean Score |",
+    "|-------|------------|",
+    `| Primitive | ${ca.mean_primitive.toFixed(4)} |`,
+    `| Composed + Meta | ${ca.mean_composed.toFixed(4)} |`
+  );
+
+  if (ca.detected) {
+    lines.push(
+      "",
+      "**Interpretation:** Primitives score well individually but composed tasks degrade, suggesting integration fragility."
+    );
+  } else {
+    lines.push(
+      "",
+      "**Interpretation:** No collapse detected — composed tasks maintain quality at scale."
+    );
+  }
+
+  return lines;
 }
 
 export async function compareLibrariesRun(input: CompareLibrariesRunInput): Promise<ComparisonRun> {
@@ -151,7 +229,8 @@ export async function compareLibrariesRun(input: CompareLibrariesRunInput): Prom
     comparisonScenario: input.comparisonScenario,
     profileId: input.profileId,
     leftLabel: input.leftLabel,
-    rightLabel: input.rightLabel
+    rightLabel: input.rightLabel,
+    irtCalibration: input.irtCalibration
   });
 
   const persistedRun: ComparisonRun = {
@@ -255,6 +334,9 @@ export function replaceFromRun(
   const { winnerSide, loserSide, winnerId, loserId } = winnerAndLoser(run);
   if (winnerTo !== loserId) {
     throw new Error(`Replace target must be the losing side (${loserId}), not ${winnerTo}.`);
+  }
+  if (!loserSide.replaceable) {
+    throw new Error("Replace is blocked because the target side is remote or ephemeral. Copy changes over deliberately instead.");
   }
 
   const targetRoot = loserSide.root_path;

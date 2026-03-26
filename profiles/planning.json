@@ -1,0 +1,70 @@
+{
+  "profile_id": "planning",
+  "label": "Planning",
+  "description": "Evaluates whether a skill library helps agents decompose ambiguous requests into structured, sequenced, scoped work — not just task lists but genuine planning discipline.",
+  "default_trials_per_side": 5,
+  "category_weights": {
+    "decomposition": 30,
+    "prioritization": 25,
+    "scoping": 25,
+    "sequencing": 20
+  },
+  "tasks": [
+    {
+      "task_id": "plan_decomp_001",
+      "category": "decomposition",
+      "prompt_text": "Review the library and determine whether its skills help agents break ambiguous or compound requests into discrete, actionable sub-tasks with clear completion criteria.",
+      "rubric_text": "0 no decomposition guidance\n1 vague mention of breaking things down\n2 some sub-task awareness but no completion criteria\n3 clear decomposition framework with defined done-states\n4 strong decomposition discipline with dependency mapping and explicit completion gates",
+      "mock_cues": ["decompose", "sub-task", "break down", "completion", "criteria", "discrete", "actionable"]
+    },
+    {
+      "task_id": "plan_decomp_002",
+      "category": "decomposition",
+      "prompt_text": "Review the library and determine whether its skills distinguish between goal-level planning and task-level execution — does it help agents avoid conflating strategy with tactics?",
+      "rubric_text": "0 no level distinction\n1 vague goal mention\n2 some goal vs task awareness\n3 clear separation of planning levels with explicit transitions\n4 strong multi-level planning with goal-strategy-task hierarchy and decision points",
+      "mock_cues": ["goal", "strategy", "tactic", "level", "hierarchy", "plan", "execute"]
+    },
+    {
+      "task_id": "plan_prior_001",
+      "category": "prioritization",
+      "prompt_text": "Review the library and determine whether its skills help agents prioritize work based on impact, risk, and dependency order rather than arbitrary or first-seen ordering.",
+      "rubric_text": "0 no prioritization guidance\n1 vague importance mention\n2 some priority awareness but no framework\n3 clear prioritization with impact and risk factors\n4 strong priority framework with dependency-aware ordering and explicit trade-off reasoning",
+      "mock_cues": ["priority", "impact", "risk", "dependency", "order", "trade-off", "critical path"]
+    },
+    {
+      "task_id": "plan_prior_002",
+      "category": "prioritization",
+      "prompt_text": "Review the library and determine whether its skills help agents identify what NOT to do — explicit deprioritization, scope cuts, and deferral decisions.",
+      "rubric_text": "0 no deprioritization awareness\n1 vague mention of focus\n2 some scope awareness but no cut discipline\n3 clear deprioritization guidance with deferral criteria\n4 strong scope-cut discipline with explicit not-now decisions and parking lot mechanics",
+      "mock_cues": ["defer", "cut", "deprioritize", "not now", "scope", "focus", "parking lot"]
+    },
+    {
+      "task_id": "plan_scope_001",
+      "category": "scoping",
+      "prompt_text": "Review the library and determine whether its skills help agents define scope boundaries before starting work — what is in, what is out, and what triggers a scope change.",
+      "rubric_text": "0 no scoping guidance\n1 vague scope mention\n2 some boundary awareness but no change triggers\n3 clear in/out scoping with change triggers\n4 strong scope contracts with explicit boundary conditions and escalation criteria",
+      "mock_cues": ["scope", "boundary", "in scope", "out of scope", "change", "trigger", "escalation"]
+    },
+    {
+      "task_id": "plan_scope_002",
+      "category": "scoping",
+      "prompt_text": "Review the library and determine whether its skills help agents right-size their response — matching effort to the complexity and stakes of the request rather than over- or under-delivering.",
+      "rubric_text": "0 no effort calibration\n1 one-size-fits-all approach\n2 some awareness of response sizing\n3 clear effort calibration with complexity signals\n4 strong effort-to-stakes matching with explicit complexity tiers and proportional response",
+      "mock_cues": ["calibrate", "proportional", "complexity", "effort", "stakes", "right-size", "tier"]
+    },
+    {
+      "task_id": "plan_seq_001",
+      "category": "sequencing",
+      "prompt_text": "Review the library and determine whether its skills help agents sequence work in dependency order — identifying blockers, parallel opportunities, and critical path items.",
+      "rubric_text": "0 no sequencing guidance\n1 vague order mention\n2 some sequential awareness but no dependency analysis\n3 clear dependency-aware sequencing with blocker identification\n4 strong sequencing with critical path analysis, parallel opportunity identification, and explicit blocking dependencies",
+      "mock_cues": ["sequence", "dependency", "blocker", "parallel", "critical path", "order", "before"]
+    },
+    {
+      "task_id": "plan_seq_002",
+      "category": "sequencing",
+      "prompt_text": "Review the library and determine whether its skills help agents re-plan when assumptions change mid-execution — adaptive sequencing rather than rigid plan-then-execute.",
+      "rubric_text": "0 no re-planning guidance\n1 vague flexibility mention\n2 some adaptation awareness\n3 clear re-planning triggers with explicit pivot criteria\n4 strong adaptive planning with assumption tracking, re-evaluation checkpoints, and plan revision discipline",
+      "mock_cues": ["re-plan", "adapt", "pivot", "assumption", "checkpoint", "revise", "change"]
+    }
+  ]
+}

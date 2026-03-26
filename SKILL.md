@@ -1,5 +1,7 @@
 # Watchtower Skill
 
+> This file makes the Watchtower repo itself benchmarkable as a skill library. It is not part of the benchmark tool.
+
 Use Watchtower when the user wants to compare two markdown skill libraries and answer:
 
 **Which side is better, why, and what should we do next?**
@@ -18,10 +20,10 @@ Trigger on requests like:
 ## What It Does
 
 - Compares exactly two sources
-- Runs one benchmark profile against both sides
+- Runs the generic default benchmark profile against both sides
 - Returns winner, scores, confidence, reasons, regressions, Devil's Advocate review, and recommended action
 - Supports local paths and GitHub sources
-- Can replace the losing side with the winner only for decisive same-library runs
+- Can replace the losing side with the winner only for decisive same-library runs with a local replacement target
 
 ## What It Does Not Do
 
@@ -58,55 +60,47 @@ If the scenario implies the comparison is the same library, use that instead of 
 
 ## Profile Selection
 
-Use `default` unless the user is clearly focused on one bundled domain:
-
-- `lead-producer`
-- `team-product-team`
-- `team-dev-team`
-- `workflow-issue-triage`
-
-If no specialized profile clearly fits, stay with `default`.
+Use `default`.
 
 ## Commands
 
-Build first:
+Install first:
 
 ```bash
 npm install
-npm run build
 ```
 
-List profiles and scenarios:
+List profiles and diagnostics:
 
 ```bash
-node apps/runner/dist/index.js profiles
+npm run watchtower -- profiles
 ```
 
 Compare two sources:
 
 ```bash
-node apps/runner/dist/index.js compare "<left>" "<right>" --scenario <scenario> --profile <profile> --executor mock
+npm run watchtower -- compare "<left>" "<right>" --scenario <scenario> --profile default --executor mock
 ```
 
-Use `--executor codex` for real Codex-backed runs once the environment is ready.
+Use `--executor codex` or `--executor claude` for real evaluations once the matching launch command is configured.
 
 Show a stored run:
 
 ```bash
-node apps/runner/dist/index.js show <run-id>
+npm run watchtower -- show <run-id>
 ```
 
 Show leaderboard or history:
 
 ```bash
-node apps/runner/dist/index.js leaderboard
-node apps/runner/dist/index.js history --limit 10
+npm run watchtower -- leaderboard
+npm run watchtower -- history --limit 10
 ```
 
 Replace the losing side with the winner:
 
 ```bash
-node apps/runner/dist/index.js replace <run-id> --winner-to <left|right> --confirm
+npm run watchtower -- replace <run-id> --winner-to <left|right> --confirm
 ```
 
 ## Result Presentation
@@ -129,10 +123,11 @@ If the run includes the v2 stats payload, summarize the ROPE verdict, confidence
 - Only offer replacement for same-library runs
 - Do not recommend replacement when confidence is low
 - Do not recommend replacement when regressions remain
+- GitHub-backed sources can be benchmarked but not overwritten
 - Cross-library comparisons should end in `keep separate` or `port ideas deliberately`
 
 ## Boundaries
 
 - Mock runs are useful for development, not final irreversible decisions
-- GitHub sources can be compared but not overwritten
+- Real runs require `WATCHTOWER_CODEX_LAUNCH` or `WATCHTOWER_CLAUDE_LAUNCH`
 - Replacement is archive-first and whole-root only

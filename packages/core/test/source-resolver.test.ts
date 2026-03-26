@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseSourceInput, resolveSource, cleanupSource, isRemoteSource } from "../src/source-resolver.js";
+import {
+  cleanupSource,
+  isRemoteSource,
+  parseSourceInput,
+  resolveSource
+} from "../src/source-resolver.js";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -24,6 +29,7 @@ describe("parseSourceInput", () => {
     expect(result.owner).toBe("saemihemma");
     expect(result.repo).toBe("watchtower");
     expect(result.ref).toBeUndefined();
+    expect(result.sourceId).toBe("github://saemihemma/watchtower");
   });
 
   it("parses github:// with branch ref (@)", () => {
@@ -71,6 +77,10 @@ describe("parseSourceInput", () => {
     expect(result.ref).toBe("feature/my-branch");
   });
 
+  it("rejects Watchtower aliases with a clear error", () => {
+    expect(() => parseSourceInput("watchtower://starter")).toThrow("Unsupported Watchtower source alias");
+  });
+
   it("throws on invalid github:// format", () => {
     expect(() => parseSourceInput("github://justowner")).toThrow("Expected github://owner/repo");
   });
@@ -103,6 +113,8 @@ describe("resolveSource — local", () => {
     expect(result.kind).toBe("local");
     expect(result.localPath).toBe(path.resolve(inputPath));
     expect(result.label).toBe(path.basename(path.resolve(inputPath)));
+    expect(result.sourceId).toBe(path.resolve(inputPath));
+    expect(result.replaceable).toBe(true);
     expect(result.tempDir).toBeUndefined();
   });
 
@@ -111,6 +123,24 @@ describe("resolveSource — local", () => {
     expect(result.kind).toBe("local");
     expect(path.isAbsolute(result.localPath)).toBe(true);
     expect(result.tempDir).toBeUndefined();
+  });
+
+  it("resolves relative local paths from the caller cwd when provided", () => {
+    const originalCallerCwd = process.env.WATCHTOWER_CALLER_CWD;
+    const callerRoot = fs.mkdtempSync(path.join(os.tmpdir(), "watchtower-caller-root-"));
+
+    try {
+      process.env.WATCHTOWER_CALLER_CWD = callerRoot;
+      const result = resolveSource("./skills");
+      expect(result.localPath).toBe(path.join(callerRoot, "skills"));
+    } finally {
+      if (originalCallerCwd === undefined) {
+        delete process.env.WATCHTOWER_CALLER_CWD;
+      } else {
+        process.env.WATCHTOWER_CALLER_CWD = originalCallerCwd;
+      }
+      fs.rmSync(callerRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -124,6 +154,8 @@ describe("cleanupSource", () => {
       originalInput: "test",
       localPath: tempDir,
       label: "test",
+      sourceId: "github://example/test",
+      replaceable: false,
       tempDir
     });
 
@@ -136,7 +168,9 @@ describe("cleanupSource", () => {
       kind: "local",
       originalInput: localPath,
       localPath,
-      label: path.basename(localPath)
+      label: path.basename(localPath),
+      sourceId: localPath,
+      replaceable: true
     });
     // Just verify it doesn't throw
     expect(true).toBe(true);
@@ -148,6 +182,8 @@ describe("cleanupSource", () => {
       originalInput: "test",
       localPath: "/nonexistent/path/watchtower-xxx",
       label: "test",
+      sourceId: "github://example/test",
+      replaceable: false,
       tempDir: "/nonexistent/path/watchtower-xxx"
     });
     // Should not throw

@@ -5,3 +5,4 @@ watchtower-data/
 *.tsbuildinfo
 npm-debug.log*
 .DS_Store
+.claude/

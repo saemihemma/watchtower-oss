@@ -1,0 +1,71 @@
+{
+  "profile_id": "complex-coding",
+  "label": "Complex Coding",
+  "description": "Evaluates whether a skill library helps agents handle multi-step implementation tasks — error handling, edge cases, testing strategy, state management, and integration correctness.",
+  "default_trials_per_side": 5,
+  "category_weights": {
+    "error_handling": 25,
+    "edge_cases": 25,
+    "testing_strategy": 20,
+    "state_management": 15,
+    "integration": 15
+  },
+  "tasks": [
+    {
+      "task_id": "cc_err_001",
+      "category": "error_handling",
+      "prompt_text": "Review the library and determine whether its skills help agents implement robust error handling — distinguishing recoverable from fatal errors, providing meaningful error messages, and avoiding silent failures.",
+      "rubric_text": "0 no error handling guidance\n1 vague try-catch mention\n2 some error awareness but no classification\n3 clear error handling with recoverable/fatal distinction and meaningful messages\n4 strong error discipline with error taxonomy, recovery strategies, propagation rules, and no-swallow enforcement",
+      "mock_cues": ["error", "exception", "recover", "fatal", "silent failure", "message", "propagate"]
+    },
+    {
+      "task_id": "cc_err_002",
+      "category": "error_handling",
+      "prompt_text": "Review the library and determine whether its skills help agents design error boundaries — where errors are caught, where they propagate, and how error context is preserved across layers.",
+      "rubric_text": "0 no error boundary concept\n1 catch-everything pattern\n2 some boundary awareness\n3 clear error boundary design with context preservation\n4 strong error boundary architecture with layer-specific handling, context chain, and boundary contracts",
+      "mock_cues": ["boundary", "catch", "propagate", "context", "layer", "chain", "contract"]
+    },
+    {
+      "task_id": "cc_edge_001",
+      "category": "edge_cases",
+      "prompt_text": "Review the library and determine whether its skills help agents systematically identify edge cases — empty inputs, boundary values, concurrent access, null/undefined states, and overflow conditions.",
+      "rubric_text": "0 no edge case awareness\n1 vague validation mention\n2 some edge case examples but no systematic approach\n3 clear edge case identification with category-based enumeration\n4 strong edge case discipline with systematic discovery, boundary analysis, and coverage verification",
+      "mock_cues": ["edge case", "boundary", "empty", "null", "overflow", "concurrent", "validate"]
+    },
+    {
+      "task_id": "cc_edge_002",
+      "category": "edge_cases",
+      "prompt_text": "Review the library and determine whether its skills help agents handle edge cases gracefully — defined behavior for unexpected inputs rather than undefined behavior or crashes.",
+      "rubric_text": "0 undefined behavior everywhere\n1 crashes on unexpected input\n2 some defensive coding\n3 clear graceful degradation with defined edge behavior\n4 strong defensive design with explicit behavior contracts for all boundary conditions",
+      "mock_cues": ["graceful", "defensive", "undefined behavior", "contract", "unexpected", "degrade", "safe"]
+    },
+    {
+      "task_id": "cc_test_001",
+      "category": "testing_strategy",
+      "prompt_text": "Review the library and determine whether its skills help agents design effective tests — choosing what to test, at what level, with what assertions, and how to avoid brittle or vacuous tests.",
+      "rubric_text": "0 no testing guidance\n1 vague test mention\n2 some testing awareness but no strategy\n3 clear testing strategy with level selection and assertion quality\n4 strong testing discipline with test pyramid, assertion value criteria, and anti-brittle patterns",
+      "mock_cues": ["test", "assertion", "brittle", "coverage", "unit", "integration", "strategy"]
+    },
+    {
+      "task_id": "cc_test_002",
+      "category": "testing_strategy",
+      "prompt_text": "Review the library and determine whether its skills help agents write tests that catch real bugs — testing behavior and contracts rather than implementation details, with meaningful failure messages.",
+      "rubric_text": "0 no behavior testing guidance\n1 implementation-detail tests\n2 some behavior awareness\n3 clear behavior-over-implementation testing with contract focus\n4 strong contract testing with behavior verification, failure diagnostics, and no-implementation-coupling rules",
+      "mock_cues": ["behavior", "contract", "implementation detail", "failure message", "diagnostic", "coupling", "regression"]
+    },
+    {
+      "task_id": "cc_state_001",
+      "category": "state_management",
+      "prompt_text": "Review the library and determine whether its skills help agents manage state cleanly — minimizing mutable state, making state transitions explicit, and preventing stale or inconsistent state.",
+      "rubric_text": "0 no state management guidance\n1 vague state mention\n2 some state awareness but allows implicit mutation\n3 clear state management with explicit transitions and staleness prevention\n4 strong state discipline with immutability preference, state machine patterns, and consistency guarantees",
+      "mock_cues": ["state", "mutable", "immutable", "transition", "stale", "consistent", "explicit"]
+    },
+    {
+      "task_id": "cc_integ_001",
+      "category": "integration",
+      "prompt_text": "Review the library and determine whether its skills help agents handle integration points correctly — API contracts, data format validation, timeout handling, and retry logic at system boundaries.",
+      "rubric_text": "0 no integration guidance\n1 vague API mention\n2 some integration awareness\n3 clear integration patterns with contract validation and timeout handling\n4 strong integration discipline with boundary contracts, format validation, retry policies, and circuit breaker patterns",
+      "mock_cues": ["integration", "API", "contract", "timeout", "retry", "boundary", "validate"]
+    }
+  ]
+}

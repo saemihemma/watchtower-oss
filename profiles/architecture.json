@@ -1,0 +1,71 @@
+{
+  "profile_id": "architecture",
+  "label": "Architecture",
+  "description": "Evaluates whether a skill library helps agents make sound architectural decisions — layering, dependency direction, ownership boundaries, composition, and coherence under scale.",
+  "default_trials_per_side": 5,
+  "category_weights": {
+    "layering": 25,
+    "dependency_direction": 25,
+    "ownership": 20,
+    "composition": 20,
+    "scale_reasoning": 10
+  },
+  "tasks": [
+    {
+      "task_id": "arch_layer_001",
+      "category": "layering",
+      "prompt_text": "Review the library and determine whether its skills help agents organize code into clear layers — with explicit contracts between layers, no leaking of implementation details, and predictable responsibility boundaries.",
+      "rubric_text": "0 no layering guidance\n1 vague separation mention\n2 some layer awareness but unclear contracts\n3 clear layering with explicit inter-layer contracts\n4 strong layering discipline with enforced abstraction barriers, contract definitions, and no-leak rules",
+      "mock_cues": ["layer", "contract", "abstraction", "separation", "responsibility", "encapsulate", "boundary"]
+    },
+    {
+      "task_id": "arch_layer_002",
+      "category": "layering",
+      "prompt_text": "Review the library and determine whether its skills help agents decide WHERE new code belongs — which layer, module, or file owns a piece of logic, and how to resolve ambiguous placement.",
+      "rubric_text": "0 no placement guidance\n1 vague module mention\n2 some placement awareness but no decision criteria\n3 clear placement rules with ownership heuristics\n4 strong placement discipline with decision trees, proximity rules, and explicit ownership resolution",
+      "mock_cues": ["placement", "ownership", "module", "belongs", "where", "decision", "organize"]
+    },
+    {
+      "task_id": "arch_dep_001",
+      "category": "dependency_direction",
+      "prompt_text": "Review the library and determine whether its skills enforce healthy dependency direction — higher-level modules depend on lower-level abstractions, not the reverse. No circular dependencies.",
+      "rubric_text": "0 no dependency direction awareness\n1 vague import mention\n2 some dependency awareness but allows circular deps\n3 clear dependency direction rules with acyclic enforcement\n4 strong dependency discipline with inversion of control, abstraction boundaries, and circular dep detection",
+      "mock_cues": ["dependency", "direction", "circular", "inversion", "abstraction", "import", "acyclic"]
+    },
+    {
+      "task_id": "arch_dep_002",
+      "category": "dependency_direction",
+      "prompt_text": "Review the library and determine whether its skills help agents manage external dependencies — when to add them, when to inline, version pinning, and how to isolate third-party surface area.",
+      "rubric_text": "0 no external dependency guidance\n1 vague package mention\n2 some dependency management awareness\n3 clear external dependency criteria with isolation patterns\n4 strong dependency management with add/remove criteria, isolation wrappers, and version discipline",
+      "mock_cues": ["external", "package", "third-party", "isolate", "wrapper", "version", "inline"]
+    },
+    {
+      "task_id": "arch_own_001",
+      "category": "ownership",
+      "prompt_text": "Review the library and determine whether its skills define clear ownership — every piece of logic has one unambiguous owner, with no shared-mutable-state or god-module anti-patterns.",
+      "rubric_text": "0 no ownership model\n1 vague responsibility mention\n2 some ownership awareness but ambiguous boundaries\n3 clear single-owner discipline with anti-pattern detection\n4 strong ownership model with explicit owner registry, no god modules, and ownership transfer protocols",
+      "mock_cues": ["ownership", "single owner", "god module", "responsible", "boundary", "shared state", "anti-pattern"]
+    },
+    {
+      "task_id": "arch_own_002",
+      "category": "ownership",
+      "prompt_text": "Review the library and determine whether its skills help agents handle cross-cutting concerns — logging, auth, error handling — without scattering logic across every module or creating tight coupling.",
+      "rubric_text": "0 no cross-cutting guidance\n1 vague middleware mention\n2 some awareness but allows scatter\n3 clear cross-cutting patterns with centralized handling\n4 strong cross-cutting discipline with aspect isolation, minimal coupling, and explicit extension points",
+      "mock_cues": ["cross-cutting", "logging", "auth", "middleware", "centralize", "coupling", "aspect"]
+    },
+    {
+      "task_id": "arch_comp_001",
+      "category": "composition",
+      "prompt_text": "Review the library and determine whether its skills promote composition over inheritance — building complex behavior by combining small, focused units rather than deep hierarchies.",
+      "rubric_text": "0 no composition guidance\n1 vague modularity mention\n2 some composition awareness\n3 clear composition-over-inheritance patterns\n4 strong composition discipline with interface contracts, pluggable units, and explicit anti-inheritance guidance",
+      "mock_cues": ["composition", "compose", "combine", "interface", "pluggable", "inheritance", "modular"]
+    },
+    {
+      "task_id": "arch_scale_001",
+      "category": "scale_reasoning",
+      "prompt_text": "Review the library and determine whether its skills help agents reason about architectural decisions under scale — what breaks when the codebase grows 10x, when the team grows, or when requirements shift.",
+      "rubric_text": "0 no scale reasoning\n1 vague scalability mention\n2 some growth awareness but no concrete analysis\n3 clear scale reasoning with growth scenarios\n4 strong scale discipline with explicit break-point analysis, team-size implications, and evolution paths",
+      "mock_cues": ["scale", "grow", "break", "evolution", "team size", "10x", "future"]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "profile_id": "game-design",
+  "label": "Game Design",
+  "description": "Benchmark profile for game design skill libraries. Focuses on gameplay depth, balance, and player communication.",
+  "default_trials_per_side": 5,
+  "category_weights": {
+    "gameplay_depth": 35,
+    "balance": 30,
+    "player_communication": 20,
+    "iteration_discipline": 15
+  },
+  "tasks": [
+    {
+      "task_id": "gd_depth_001",
+      "category": "gameplay_depth",
+      "prompt_text": "Review the library and determine whether its skills address emergent gameplay, system interactions, and second-order effects rather than only surface-level mechanics.",
+      "rubric_text": "0 no depth\n1 surface mechanics only\n2 some system interaction awareness\n3 clear emergent gameplay guidance\n4 strong systems thinking with second-order effect awareness",
+      "mock_cues": ["emergent", "system", "interaction", "depth", "mechanic", "second-order"]
+    },
+    {
+      "task_id": "gd_depth_002",
+      "category": "gameplay_depth",
+      "prompt_text": "Review the library and determine whether its skills help designers think about player motivation loops — acquisition, progression, mastery, and social dynamics.",
+      "rubric_text": "0 no motivation modeling\n1 basic reward mention\n2 some loop awareness\n3 clear motivation loop guidance\n4 strong player psychology integration with loop design",
+      "mock_cues": ["motivation", "loop", "progression", "mastery", "reward", "player"]
+    },
+    {
+      "task_id": "gd_balance_001",
+      "category": "balance",
+      "prompt_text": "Review the library and determine whether its skills address balance — do they help designers reason about fairness, counterplay, and asymmetric value?",
+      "rubric_text": "0 no balance awareness\n1 vague fairness mention\n2 some balance guidance\n3 clear balance framework with counterplay\n4 strong balance methodology with asymmetric value analysis",
+      "mock_cues": ["balance", "fairness", "counterplay", "asymmetric", "value", "tuning"]
+    },
+    {
+      "task_id": "gd_comm_001",
+      "category": "player_communication",
+      "prompt_text": "Review the library and determine whether its skills help designers communicate system state, feedback, and consequences clearly to players.",
+      "rubric_text": "0 no communication guidance\n1 basic UI mention\n2 some feedback awareness\n3 clear player communication framework\n4 strong feedback loop design with consequence signaling",
+      "mock_cues": ["feedback", "communicate", "signal", "consequence", "clarity", "player"]
+    },
+    {
+      "task_id": "gd_iter_001",
+      "category": "iteration_discipline",
+      "prompt_text": "Review the library and determine whether its skills promote iteration discipline — testing hypotheses, measuring outcomes, and replacing assumptions with evidence.",
+      "rubric_text": "0 no iteration awareness\n1 vague testing mention\n2 some iteration guidance\n3 clear test-measure-iterate framework\n4 strong evidence-based iteration with hypothesis tracking",
+      "critical_regression": true,
+      "mock_cues": ["iterate", "hypothesis", "measure", "evidence", "test", "replace"]
+    }
+  ]
+}

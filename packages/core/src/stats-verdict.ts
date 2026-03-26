@@ -20,7 +20,8 @@ import {
   ComparisonWinner,
   ConfidenceLevel,
   EnhancedCategoryScore,
-  Scorecard
+  Scorecard,
+  IRTWeightOverride
 } from "./schemas.js";
 import {
   bayesianUpdate,
@@ -50,11 +51,46 @@ export type EnhancedScorecard = {
   };
 };
 
+/**
+ * Apply IRT weights to category weights.
+ * For each category, the base weight is multiplied by the mean IRT weight of its tasks.
+ * Tasks not found in the calibration default to 1.0 (with warning).
+ */
+export function applyIRTWeights(
+  pack: BenchmarkPack,
+  tasks: BenchmarkTask[],
+  weights: IRTWeightOverride[]
+): BenchmarkPack {
+  const weightMap = new Map(weights.map(w => [w.task_id, w.irt_weight]));
+  const adjustedCategoryWeights: Record<string, number> = {};
+
+  for (const [category, baseWeight] of Object.entries(pack.category_weights)) {
+    const categoryTasks = tasks.filter(t => t.category === category);
+    const taskIrtWeights = categoryTasks.map(t => {
+      const w = weightMap.get(t.task_id);
+      if (w === undefined) {
+        console.warn(
+          `[watchtower/irt] Task ${t.task_id} not in calibration. Using default weight 1.0.`
+        );
+      }
+      return w ?? 1.0;
+    });
+    const meanIrtWeight =
+      taskIrtWeights.length > 0
+        ? taskIrtWeights.reduce((a, b) => a + b, 0) / taskIrtWeights.length
+        : 1.0;
+    adjustedCategoryWeights[category] = baseWeight * meanIrtWeight;
+  }
+
+  return { ...pack, category_weights: adjustedCategoryWeights };
+}
+
 export function computeEnhancedScorecard(inputs: {
   tasks: BenchmarkTask[];
   benchmarkPack: BenchmarkPack;
   summaries: TaskSideSummary[];
   trialResults: TaskTrialResult[];
+  irtWeights?: IRTWeightOverride[];
   config?: {
     priorMean?: number;
     priorSigma?: number;
@@ -69,8 +105,13 @@ export function computeEnhancedScorecard(inputs: {
     benchmarkPack,
     summaries,
     trialResults,
+    irtWeights,
     config = {}
   } = inputs;
+
+  const effectivePack = irtWeights
+    ? applyIRTWeights(benchmarkPack, tasks, irtWeights)
+    : benchmarkPack;
 
   const {
     priorMean = DEFAULT_PRIOR_MEAN,
@@ -83,7 +124,7 @@ export function computeEnhancedScorecard(inputs: {
 
   const { winner, scorecard } = computeScorecard({
     tasks,
-    benchmarkPack,
+    benchmarkPack: effectivePack,
     summaries,
     trialResults
   });

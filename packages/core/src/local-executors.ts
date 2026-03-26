@@ -3,20 +3,51 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ensureDir, sha256Bytes, walkFiles } from "./files.js";
-import { type Executor, type ExecutorInput, type ExecutorOutput } from "./schemas.js";
+import { lookupMockCues } from "./profile-loader.js";
+import {
+  type Executor,
+  type ExecutorInput,
+  type ExecutorKind,
+  type ExecutorOutput,
+  type LaunchShell,
+  type ProviderDiagnostics,
+  type WatchtowerDiagnostics
+} from "./schemas.js";
 
-type CodexExecutorOptions = {
+type RealExecutorKind = Exclude<ExecutorKind, "mock">;
+
+type ProviderExecutorOptions = {
   launchCommand?: string;
+  launchShell?: LaunchShell;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+};
+
+type DiagnosticsOptions = {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  probeExecutable?: (command: string, platform: NodeJS.Platform) => string | null;
+};
+
+const PROVIDER_ENV: Record<RealExecutorKind, string> = {
+  codex: "WATCHTOWER_CODEX_LAUNCH",
+  claude: "WATCHTOWER_CLAUDE_LAUNCH"
 };
 
 function bounded(value: number, minimum: number, maximum: number): number {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+/**
+ * Collect text from a skill library bundle for mock executor scoring.
+ *
+ * Reads up to 80 text-format files (md, yaml, yml, toml, json, txt),
+ * truncating each to 5000 chars. These limits keep mock scoring fast
+ * and memory-bounded while capturing enough signal for keyword matching.
+ * The concatenated output is what the mock executor scores against.
+ */
 function collectBundleText(bundleDir: string): string {
-  const entries = walkFiles(bundleDir).filter(
-    (entry) => /\.(md|yaml|yml|toml|json|txt)$/i.test(entry.relativePath)
-  );
+  const entries = walkFiles(bundleDir).filter((entry) => /\.(md|yaml|yml|toml|json|txt)$/i.test(entry.relativePath));
   const chunks: string[] = [];
   for (const entry of entries.slice(0, 80)) {
     const text = fs.readFileSync(entry.absolutePath, "utf8").slice(0, 5000);
@@ -25,50 +56,108 @@ function collectBundleText(bundleDir: string): string {
   return chunks.join("\n\n---\n\n");
 }
 
-function taskCueSet(input: ExecutorInput): string[] {
-  const family = input.task.family.toLowerCase();
-  const taskId = input.task.task_id.toLowerCase();
-  const prompt = input.promptText.toLowerCase();
+const GENERIC_STOPWORDS = new Set([
+  "the",
+  "and",
+  "that",
+  "with",
+  "this",
+  "from",
+  "into",
+  "they",
+  "them",
+  "their",
+  "there",
+  "should",
+  "would",
+  "could",
+  "instead",
+  "review",
+  "library",
+  "skill",
+  "skills",
+  "determine",
+  "whether",
+  "provide",
+  "provides",
+  "about",
+  "clear",
+  "clearly",
+  "across",
+  "among",
+  "while",
+  "where",
+  "which",
+  "when",
+  "what",
+  "your",
+  "user",
+  "users",
+  "than",
+  "have",
+  "has",
+  "only"
+]);
 
-  if (family === "default" || taskId.startsWith("default_")) {
-    if (taskId.includes("usage") || taskId.includes("discovery")) {
-      return ["use when", "do not use", "best for", "not for", "when to use"];
-    }
-    if (taskId.includes("boundary")) {
-      return ["what it is", "what it is not", "scope", "boundaries", "overlap"];
-    }
-    if (taskId.includes("review")) {
-      return ["evidence", "verify", "acceptance", "example", "steps"];
-    }
-    if (taskId.includes("handoff")) {
-      return ["next action", "output", "handoff", "deliverable", "context"];
-    }
-  }
+function extractTextCues(text: string, minimumLength = 4, limit = 8): string[] {
+  const tokens = text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .filter((token) => token.length >= minimumLength && !GENERIC_STOPWORDS.has(token));
 
-  if (family.includes("lead-producer") || taskId.startsWith("lp_") || prompt.includes("devil's advocate")) {
-    return [
-      "Lead Producer",
-      "Devil's Advocate",
-      "Stress Test",
-      "Acceptance",
-      "What It Is",
-      "What It Is NOT",
-      "smallest sufficient",
-      "open questions"
-    ];
-  }
-  if (family.includes("product") || taskId.startsWith("product_")) {
-    return ["Product", "scope", "feasibility", "go/no-go", "trade-off"];
-  }
-  if (family.includes("dev") || taskId.startsWith("dev_")) {
-    return ["architecture", "code quality", "tests", "verification", "review"];
-  }
-  if (family.includes("issue-triage") || family.includes("workflow") || taskId.startsWith("triage_")) {
-    return ["handoff", "next steps", "investigation", "owner", "context"];
-  }
-  return ["skill", "benchmark", "review"];
+  return [...new Set(tokens)].slice(0, limit);
 }
 
+/** Built-in cue mappings for default profile task ID prefixes. */
+const BUILTIN_CUE_TABLE: Array<{ match: (id: string) => boolean; cues: string[] }> = [
+  { match: (id) => id.includes("usage") || id.includes("discovery"), cues: ["use", "best", "discover", "overlap"] },
+  { match: (id) => id.includes("boundary"), cues: ["boundary", "scope", "overlap", "responsibilities"] },
+  { match: (id) => id.includes("review"), cues: ["evidence", "verify", "acceptance", "examples", "steps"] },
+  { match: (id) => id.includes("handoff"), cues: ["handoff", "output", "context", "next", "action"] },
+  { match: (id) => id.includes("arch_"), cues: ["structure", "layer", "compose", "dependency", "delegate", "ownership"] },
+  { match: (id) => id.includes("hygiene_"), cues: ["lean", "bloat", "replace", "accumulate", "minimal", "sharp"] },
+  { match: (id) => id.includes("constraint_"), cues: ["ambiguous", "partial", "degrade", "fallback", "missing", "graceful"] }
+];
+
+function taskCueSet(input: ExecutorInput): string[] {
+  const taskId = input.task.task_id.toLowerCase();
+  const promptCues = extractTextCues(input.promptText);
+  const rubricCues = extractTextCues(input.rubricText ?? "", 5, 6);
+
+  // Check the extensible mock cue registry first (custom profiles register cues here)
+  const registryCues = lookupMockCues(input.task.task_id);
+  if (registryCues) {
+    return [...new Set([...registryCues, ...promptCues, ...rubricCues])];
+  }
+
+  // Fall back to built-in cue table
+  for (const entry of BUILTIN_CUE_TABLE) {
+    if (entry.match(taskId)) {
+      return [...new Set([...entry.cues, ...promptCues, ...rubricCues])];
+    }
+  }
+
+  return [...new Set([...promptCues, ...rubricCues, "benchmark", "quality", "guidance"])];
+}
+
+/**
+ * Compute a mock executor score for a single task trial.
+ *
+ * Scoring strategy:
+ * 1. Collect text from the skill library bundle (up to 80 files, 5000 chars each).
+ * 2. Resolve cue keywords for this task: check the mock cue registry first (custom
+ *    profiles register cues here), then fall back to the built-in cue table, then
+ *    extract keywords from the prompt and rubric text.
+ * 3. Count how many cues appear in the bundle text. Base score = matched / total cues.
+ * 4. Add deterministic jitter derived from SHA-256 of the bundle+prompt+task+side.
+ *    Jitter range: [-0.04, +0.04], ensuring scores vary slightly across sides and
+ *    trials without randomness. Formula: ((hash_prefix_int % 9) - 4) / 100.
+ * 5. For rubric tasks: quantize to 0–4 scale (0, 0.25, 0.5, 0.75, 1.0).
+ *    For deterministic tasks: binary pass/fail at 0.55 threshold.
+ *
+ * Mock scores are directional signals for development. They are not substitutes
+ * for real executor evaluation on irreversible decisions.
+ */
 function computeMockOutcome(input: ExecutorInput): ExecutorOutput {
   const bundleText = collectBundleText(input.bundleDir);
   const cues = taskCueSet(input);
@@ -108,9 +197,10 @@ export function createMockExecutor(): Executor {
   };
 }
 
-function renderCodexInstruction(input: ExecutorInput): string {
+function renderProviderInstruction(provider: RealExecutorKind, input: ExecutorInput): string {
   return [
-    "You are Watchtower Benchmark, comparing one side of a markdown skill library benchmark.",
+    `You are Watchtower Benchmark, running through the ${provider} executor.`,
+    "Compare one side of a markdown skill library benchmark.",
     `Task ID: ${input.task.task_id}`,
     `Task Version: ${input.task.task_version}`,
     `Task Family: ${input.task.family}`,
@@ -133,23 +223,24 @@ function renderCodexInstruction(input: ExecutorInput): string {
   ].join("\n");
 }
 
-function createTrialEnv(): {
+function createTrialEnv(baseEnv: NodeJS.ProcessEnv): {
   env: NodeJS.ProcessEnv;
   instructionPath: string;
 } {
   const trialRoot = fs.mkdtempSync(path.join(os.tmpdir(), "watchtower-trial-"));
-  const codexHome = path.join(trialRoot, "codex-home");
+  const toolHome = path.join(trialRoot, "tool-home");
   const homeDir = path.join(trialRoot, "home");
   const tempDir = path.join(trialRoot, "tmp");
-  ensureDir(codexHome);
+  ensureDir(toolHome);
   ensureDir(homeDir);
   ensureDir(tempDir);
   const instructionPath = path.join(trialRoot, "instruction.txt");
 
   return {
     env: {
-      ...process.env,
-      CODEX_HOME: codexHome,
+      ...baseEnv,
+      CODEX_HOME: baseEnv.CODEX_HOME ?? toolHome,
+      CLAUDE_HOME: baseEnv.CLAUDE_HOME ?? toolHome,
       HOME: homeDir,
       USERPROFILE: homeDir,
       TMP: tempDir,
@@ -160,7 +251,7 @@ function createTrialEnv(): {
   };
 }
 
-function parseCodexResult(stdout: string): ExecutorOutput {
+function parseExecutorResult(provider: RealExecutorKind, stdout: string): ExecutorOutput {
   try {
     const parsed = JSON.parse(stdout.trim()) as {
       normalizedScore?: number;
@@ -182,37 +273,156 @@ function parseCodexResult(stdout: string): ExecutorOutput {
       normalizedScore: null,
       falsePositive: 0,
       status: "failed",
-      reason: `codex_output_parse_failed:${error instanceof Error ? error.message : "unknown"}`
+      reason: `${provider}_output_parse_failed:${error instanceof Error ? error.message : "unknown"}`
     };
   }
 }
 
-export function createCodexExecutor(options: CodexExecutorOptions = {}): Executor {
+export function resolveLaunchShell(
+  platform: NodeJS.Platform = process.platform,
+  preferredShell = process.env.WATCHTOWER_LAUNCH_SHELL
+): LaunchShell {
+  if (preferredShell === "powershell" || preferredShell === "cmd" || preferredShell === "sh") {
+    return preferredShell;
+  }
+  return platform === "win32" ? "powershell" : "sh";
+}
+
+function shellCommand(shell: LaunchShell, platform: NodeJS.Platform): { command: string; args: string[] } {
+  if (shell === "cmd") {
+    return { command: platform === "win32" ? "cmd.exe" : "cmd", args: ["/d", "/s", "/c"] };
+  }
+  if (shell === "powershell") {
+    return {
+      command: platform === "win32" ? "powershell.exe" : "pwsh",
+      args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"]
+    };
+  }
+  return { command: "/bin/sh", args: ["-lc"] };
+}
+
+function parseLaunchExecutable(command: string): string | null {
+  const trimmed = command.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const quoted = trimmed.match(/^"([^"]+)"/);
+  if (quoted) {
+    return quoted[1];
+  }
+
+  const unquoted = trimmed.match(/^([^\s]+)/);
+  return unquoted?.[1] ?? null;
+}
+
+function defaultBinaryForProvider(provider: RealExecutorKind): string {
+  return provider;
+}
+
+function probeExecutableOnPath(command: string, platform: NodeJS.Platform = process.platform): string | null {
+  if (!command) {
+    return null;
+  }
+
+  if (command.includes("/") || command.includes("\\")) {
+    const resolved = path.resolve(command);
+    return fs.existsSync(resolved) ? resolved : null;
+  }
+
+  const probe = platform === "win32"
+    ? childProcess.spawnSync("where.exe", [command], { encoding: "utf8", timeout: 10_000 })
+    : childProcess.spawnSync("which", [command], { encoding: "utf8", timeout: 10_000 });
+
+  if (probe.status !== 0) {
+    return null;
+  }
+
+  return probe.stdout.trim().split(/\r?\n/)[0] ?? null;
+}
+
+function resolveProviderLaunch(
+  provider: RealExecutorKind,
+  options: ProviderExecutorOptions = {}
+): {
+  env: NodeJS.ProcessEnv;
+  platform: NodeJS.Platform;
+  launchCommand: string | null;
+  launchShell: LaunchShell;
+} {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
   return {
-    version: "codex-configurable-v3",
+    env,
+    platform,
+    launchCommand: options.launchCommand ?? env[PROVIDER_ENV[provider]] ?? null,
+    launchShell: options.launchShell ?? resolveLaunchShell(platform, env.WATCHTOWER_LAUNCH_SHELL)
+  };
+}
+
+function providerDiagnostics(
+  provider: RealExecutorKind,
+  options: DiagnosticsOptions = {}
+): ProviderDiagnostics {
+  const env = options.env ?? process.env;
+  const platform = options.platform ?? process.platform;
+  const launchCommand = env[PROVIDER_ENV[provider]] ?? null;
+  const launchShell = resolveLaunchShell(platform, env.WATCHTOWER_LAUNCH_SHELL);
+  const launcher = launchCommand ? parseLaunchExecutable(launchCommand) : defaultBinaryForProvider(provider);
+  const probe = options.probeExecutable ?? probeExecutableOnPath;
+  const launcherPath = launcher ? probe(launcher, platform) : null;
+
+  return {
+    provider,
+    launch_configured: Boolean(launchCommand),
+    launch_command: launchCommand,
+    launch_shell: launchShell,
+    launcher,
+    launcher_path: launcherPath,
+    ready: Boolean(launchCommand) && (launcher === null || launcherPath !== null)
+  };
+}
+
+export function collectDiagnostics(options: DiagnosticsOptions = {}): WatchtowerDiagnostics {
+  const platform = options.platform ?? process.platform;
+  const env = options.env ?? process.env;
+  return {
+    host_platform: platform,
+    default_launch_shell: resolveLaunchShell(platform, env.WATCHTOWER_LAUNCH_SHELL),
+    providers: {
+      codex: providerDiagnostics("codex", options),
+      claude: providerDiagnostics("claude", options)
+    }
+  };
+}
+
+function createProviderExecutor(provider: RealExecutorKind, options: ProviderExecutorOptions = {}): Executor {
+  return {
+    version: `${provider}-configurable-v4`,
     async run(input: ExecutorInput): Promise<ExecutorOutput> {
-      const launchCommand = options.launchCommand ?? process.env.WATCHTOWER_CODEX_LAUNCH;
-      if (!launchCommand) {
+      const resolved = resolveProviderLaunch(provider, options);
+      if (!resolved.launchCommand) {
         return {
           normalizedScore: null,
           falsePositive: 0,
           status: "failed",
-          reason: "codex_launch_unconfigured"
+          reason: `${provider}_launch_unconfigured`
         };
       }
 
-      const trial = createTrialEnv();
-      fs.writeFileSync(trial.instructionPath, renderCodexInstruction(input), "utf8");
+      const trial = createTrialEnv(resolved.env);
+      fs.writeFileSync(trial.instructionPath, renderProviderInstruction(provider, input), "utf8");
 
-      const command = launchCommand
+      const command = resolved.launchCommand
         .replaceAll("{instructionFile}", trial.instructionPath)
         .replaceAll("{bundleDir}", input.bundleDir);
 
-      const result = childProcess.spawnSync("cmd.exe", ["/d", "/s", "/c", command], {
+      const shell = shellCommand(resolved.launchShell, resolved.platform);
+      const result = childProcess.spawnSync(shell.command, [...shell.args, command], {
         cwd: input.bundleDir,
         env: trial.env,
         encoding: "utf8",
-        timeout: 120000
+        timeout: 120_000
       });
 
       if (result.error) {
@@ -220,7 +430,7 @@ export function createCodexExecutor(options: CodexExecutorOptions = {}): Executo
           normalizedScore: null,
           falsePositive: 0,
           status: "failed",
-          reason: `codex_spawn_failed:${result.error.message}`
+          reason: `${provider}_spawn_failed:${result.error.message}`
         };
       }
       if (result.status !== 0) {
@@ -228,38 +438,19 @@ export function createCodexExecutor(options: CodexExecutorOptions = {}): Executo
           normalizedScore: null,
           falsePositive: 0,
           status: "failed",
-          reason: `codex_exit_${result.status}:${(result.stderr || result.stdout).trim().slice(0, 240)}`
+          reason: `${provider}_exit_${result.status}:${(result.stderr || result.stdout).trim().slice(0, 240)}`
         };
       }
 
-      return parseCodexResult(result.stdout);
+      return parseExecutorResult(provider, result.stdout);
     }
   };
 }
 
-export function collectDiagnostics(): {
-  codexPath: string | null;
-  wslStatus: "available" | "missing";
-  launchConfigured: boolean;
-  realExecutorReady: boolean;
-} {
-  const whereResult = childProcess.spawnSync("cmd.exe", ["/d", "/s", "/c", "where codex"], {
-    encoding: "utf8"
-  });
-  const codexPath =
-    whereResult.status === 0 ? whereResult.stdout.trim().split(/\r?\n/)[0] ?? null : null;
+export function createCodexExecutor(options: ProviderExecutorOptions = {}): Executor {
+  return createProviderExecutor("codex", options);
+}
 
-  const wslResult = childProcess.spawnSync("wsl.exe", ["--status"], {
-    encoding: "utf8",
-    timeout: 10000
-  });
-  const launchConfigured = Boolean(process.env.WATCHTOWER_CODEX_LAUNCH);
-  const wslStatus = wslResult.status === 0 ? "available" : "missing";
-
-  return {
-    codexPath,
-    wslStatus,
-    launchConfigured,
-    realExecutorReady: launchConfigured && wslStatus === "available"
-  };
+export function createClaudeExecutor(options: ProviderExecutorOptions = {}): Executor {
+  return createProviderExecutor("claude", options);
 }

@@ -24,12 +24,15 @@ Local inputs:
 
 - treated as local paths
 - resolved to absolute paths before snapshotting
+- remain replaceable targets when the run is otherwise replace-eligible
 
 GitHub inputs:
 
+- normalized to a canonical GitHub source id
 - cloned to a temporary directory under the system temp root
 - labeled with `owner/repo` or `owner/repo@ref`
 - cleaned up automatically after the run completes
+- marked as non-replaceable targets
 
 Branch and tag refs:
 
@@ -60,16 +63,17 @@ After resolution, each side must still pass the normal Watchtower validation:
 Replacement is local-only:
 
 - same-library runs may replace one local side with the other when the run is replace-eligible
-- GitHub sources are never replacement targets
+- GitHub-backed sources are never replacement targets
 - cross-library comparisons are never replacement-eligible
 
 ## Failure Modes
 
 Common errors:
 
+- unsupported source alias
 - missing or invalid GitHub repo
 - missing branch, tag, or commit
 - missing git credentials for private repos
 - no `SKILL.md` files after clone
 
-When GitHub resolution fails, Watchtower surfaces the clone or checkout failure and does not continue into benchmarking.
+When source resolution fails, Watchtower surfaces the clone or checkout failure and does not continue into benchmarking.

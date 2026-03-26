@@ -1,0 +1,57 @@
+{
+  "profile_id": "end-to-end",
+  "label": "End-to-End Engineering",
+  "description": "Composite benchmark extending the default profile with architecture, complex coding, and hygiene tasks. Tests whether a skill library supports the full engineering lifecycle — from planning through clean implementation to maintainable output.",
+  "extends_default": true,
+  "default_trials_per_side": 7,
+  "category_weights": {
+    "architecture_quality": 15,
+    "implementation_rigor": 15,
+    "hygiene_discipline": 10
+  },
+  "tasks": [
+    {
+      "task_id": "e2e_arch_001",
+      "category": "architecture_quality",
+      "prompt_text": "Review the library and determine whether its skills help agents produce architecturally sound output — clear layering, correct dependency direction, and explicit ownership boundaries in generated code or plans.",
+      "rubric_text": "0 no architectural awareness\n1 flat structure with no layering\n2 some organization but unclear dependencies\n3 clear architectural output with layering and dependency direction\n4 strong architectural quality with enforced contracts, ownership clarity, and composition patterns",
+      "mock_cues": ["architecture", "layer", "dependency", "ownership", "contract", "composition", "structure"]
+    },
+    {
+      "task_id": "e2e_arch_002",
+      "category": "architecture_quality",
+      "prompt_text": "Review the library and determine whether its skills help agents make sound build-vs-buy and abstraction-level decisions — when to introduce a new module, when to inline, and when to use an existing component.",
+      "rubric_text": "0 no abstraction-level guidance\n1 vague modularity mention\n2 some decision awareness\n3 clear build-vs-buy criteria with abstraction-level heuristics\n4 strong decision framework with cost analysis, reuse criteria, and explicit inline-vs-extract triggers",
+      "mock_cues": ["build", "buy", "abstraction", "inline", "extract", "reuse", "module"]
+    },
+    {
+      "task_id": "e2e_impl_001",
+      "category": "implementation_rigor",
+      "prompt_text": "Review the library and determine whether its skills help agents produce implementation that handles errors, edge cases, and unexpected inputs systematically rather than only the happy path.",
+      "rubric_text": "0 happy path only\n1 vague error mention\n2 some error handling but gaps in edge coverage\n3 clear error and edge case handling with systematic approach\n4 strong implementation rigor with error taxonomy, edge case enumeration, and defensive contracts",
+      "mock_cues": ["error", "edge case", "happy path", "defensive", "systematic", "handle", "unexpected"]
+    },
+    {
+      "task_id": "e2e_impl_002",
+      "category": "implementation_rigor",
+      "prompt_text": "Review the library and determine whether its skills help agents write code that is testable by design — injectable dependencies, pure functions where possible, and clear interfaces for mocking.",
+      "rubric_text": "0 no testability awareness\n1 vague testing mention\n2 some testability but tightly coupled\n3 clear testable design with dependency injection and mockable interfaces\n4 strong testability discipline with pure function preference, explicit seams, and test-friendly architecture",
+      "mock_cues": ["testable", "inject", "pure function", "mock", "interface", "seam", "decouple"]
+    },
+    {
+      "task_id": "e2e_hygiene_001",
+      "category": "hygiene_discipline",
+      "prompt_text": "Review the library and determine whether its skills help agents maintain code hygiene throughout a multi-step task — keeping diffs clean, removing dead code as it appears, and not leaving TODO debris.",
+      "rubric_text": "0 no hygiene maintenance\n1 cleanup as afterthought\n2 some hygiene awareness during implementation\n3 clear continuous hygiene with clean-as-you-go discipline\n4 strong hygiene throughout with diff minimization, immediate dead-code removal, and zero-TODO-debt policy",
+      "critical_regression": true,
+      "mock_cues": ["hygiene", "clean", "diff", "dead code", "TODO", "debt", "minimal"]
+    },
+    {
+      "task_id": "e2e_hygiene_002",
+      "category": "hygiene_discipline",
+      "prompt_text": "Review the library and determine whether its skills help agents produce output that a human reviewer can approve quickly — readable, well-structured, minimal, and self-documenting.",
+      "rubric_text": "0 unreadable output\n1 functional but hard to review\n2 some readability effort\n3 clear reviewer-friendly output with good structure and naming\n4 strong review-ready code with self-documenting patterns, minimal cognitive load, and obvious intent",
+      "mock_cues": ["readable", "reviewer", "self-documenting", "minimal", "intent", "structure", "approve"]
+    }
+  ]
+}

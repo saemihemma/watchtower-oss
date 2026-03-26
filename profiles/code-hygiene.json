@@ -1,0 +1,72 @@
+{
+  "profile_id": "code-hygiene",
+  "label": "Code Hygiene",
+  "description": "Evaluates whether a skill library promotes clean, minimal, replace-disciplined code — catching bloat, dead code, additive drift, and naming decay.",
+  "default_trials_per_side": 5,
+  "category_weights": {
+    "bloat_detection": 30,
+    "replace_discipline": 25,
+    "dead_code": 20,
+    "naming_clarity": 15,
+    "diff_hygiene": 10
+  },
+  "tasks": [
+    {
+      "task_id": "ch_bloat_001",
+      "category": "bloat_detection",
+      "prompt_text": "Review the library and determine whether its skills help agents detect and prevent code bloat — unnecessary abstractions, redundant wrappers, over-engineering, and defensive padding that adds complexity without value.",
+      "rubric_text": "0 no bloat awareness\n1 vague mention of keeping things simple\n2 some bloat detection guidance but no criteria\n3 clear bloat detection with observable criteria\n4 strong anti-bloat discipline with concrete patterns, detection heuristics, and removal triggers",
+      "mock_cues": ["bloat", "unnecessary", "redundant", "over-engineer", "simplify", "remove", "lean"]
+    },
+    {
+      "task_id": "ch_bloat_002",
+      "category": "bloat_detection",
+      "prompt_text": "Review the library and determine whether its skills help agents recognize additive drift — the pattern of layering new code on top of old instead of replacing, leading to duplicate logic and growing file sizes.",
+      "rubric_text": "0 no additive drift awareness\n1 vague accumulation mention\n2 some awareness but no detection method\n3 clear additive drift detection with replacement triggers\n4 strong drift prevention with size tracking, duplication detection, and explicit replace-or-justify gates",
+      "mock_cues": ["additive", "drift", "accumulate", "duplicate", "layer", "replace", "grow"]
+    },
+    {
+      "task_id": "ch_replace_001",
+      "category": "replace_discipline",
+      "prompt_text": "Review the library and determine whether its skills enforce replace-don't-accumulate discipline — when updating code, do they guide agents to replace the old implementation cleanly rather than appending alongside it?",
+      "rubric_text": "0 no replace discipline\n1 vague update mention\n2 some replacement awareness but allows accumulation\n3 clear replace-don't-accumulate guidance\n4 strong replacement discipline with explicit old-code removal, migration steps, and no-parallel-implementation rules",
+      "critical_regression": true,
+      "mock_cues": ["replace", "accumulate", "remove old", "migrate", "clean", "swap", "supersede"]
+    },
+    {
+      "task_id": "ch_replace_002",
+      "category": "replace_discipline",
+      "prompt_text": "Review the library and determine whether its skills help agents handle the transition period during replacement — deprecation notices, compatibility shims, and cleanup verification.",
+      "rubric_text": "0 no transition guidance\n1 vague deprecation mention\n2 some transition awareness\n3 clear deprecation and migration path\n4 strong transition discipline with deprecation notices, shim lifecycle, and cleanup verification steps",
+      "mock_cues": ["deprecate", "transition", "shim", "compatibility", "cleanup", "verify", "migration"]
+    },
+    {
+      "task_id": "ch_dead_001",
+      "category": "dead_code",
+      "prompt_text": "Review the library and determine whether its skills help agents identify and remove dead code — unused exports, unreachable branches, orphaned helpers, and stale feature flags.",
+      "rubric_text": "0 no dead code awareness\n1 vague cleanup mention\n2 some dead code detection but no systematic approach\n3 clear dead code identification with removal criteria\n4 strong dead code discipline with detection patterns, usage analysis, and explicit removal gates",
+      "mock_cues": ["dead code", "unused", "unreachable", "orphan", "stale", "remove", "prune"]
+    },
+    {
+      "task_id": "ch_dead_002",
+      "category": "dead_code",
+      "prompt_text": "Review the library and determine whether its skills distinguish between dead code and intentional API surface — do they help agents avoid removing public exports that serve external consumers?",
+      "rubric_text": "0 no distinction between dead and public API\n1 vague API mention\n2 some awareness of public surface\n3 clear dead-vs-API distinction with usage verification\n4 strong public API preservation discipline with consumer analysis and safe-removal criteria",
+      "mock_cues": ["public API", "export", "consumer", "external", "surface", "safe removal", "usage"]
+    },
+    {
+      "task_id": "ch_naming_001",
+      "category": "naming_clarity",
+      "prompt_text": "Review the library and determine whether its skills promote clear, accurate naming — do variable, function, and file names communicate intent, scope, and behavior without requiring comments to decode?",
+      "rubric_text": "0 no naming guidance\n1 vague naming mention\n2 some naming conventions but no intent criteria\n3 clear naming discipline with intent-communication standards\n4 strong naming framework with scope encoding, behavior hints, and anti-pattern detection",
+      "mock_cues": ["naming", "intent", "clarity", "descriptive", "convention", "rename", "meaningful"]
+    },
+    {
+      "task_id": "ch_diff_001",
+      "category": "diff_hygiene",
+      "prompt_text": "Review the library and determine whether its skills promote clean diffs — minimal, focused changesets that touch only what is necessary, with no formatting churn, whitespace noise, or unrelated changes bundled in.",
+      "rubric_text": "0 no diff awareness\n1 vague commit mention\n2 some changeset awareness\n3 clear diff hygiene with focused changeset guidance\n4 strong diff discipline with minimal-touch rules, no-churn enforcement, and atomic commit patterns",
+      "mock_cues": ["diff", "changeset", "minimal", "focused", "atomic", "churn", "commit"]
+    }
+  ]
+}

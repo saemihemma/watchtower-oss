@@ -27,7 +27,9 @@ export function loadEloLedger(dataRoot: string): EloLedger {
   }
   try {
     return JSON.parse(fs.readFileSync(filePath, "utf8")) as EloLedger;
-  } catch {
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: Failed to parse elo.json at ${filePath}: ${msg}. Starting with empty ledger.`);
     return createEmptyLedger();
   }
 }
@@ -42,7 +44,7 @@ export function saveEloLedger(dataRoot: string, ledger: EloLedger): void {
  * Derive a stable library ID from a root path.
  * Uses the last two path segments to create a human-readable ID.
  */
-function deriveLibraryId(rootPath: string): string {
+export function deriveLibraryId(rootPath: string): string {
   const normalized = rootPath.replace(/\\/g, "/").replace(/\/+$/, "");
   const segments = normalized.split("/");
   const tail = segments.slice(-2).join("/");

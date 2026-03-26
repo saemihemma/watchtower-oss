@@ -1,5 +1,7 @@
 {
   "name": "watchtower",
+  "version": "1.0.0",
+  "description": "A local benchmark for markdown skill libraries. Compare, calibrate, and tournament skill libraries with psychometric rigor.",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -7,8 +9,19 @@
   ],
   "scripts": {
     "build": "tsc -b tsconfig.json",
-    "dev:runner": "npm run dev --workspace @watchtower/runner",
+    "dev:runner": "npm run dev --workspace @watchtower-bench/runner",
+    "watchtower": "npm run dev --workspace @watchtower-bench/runner --",
     "test": "vitest run"
+  },
+  "author": "Sæmundur",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saemihemma/watchtower.git"
+  },
+  "homepage": "https://github.com/saemihemma/watchtower#readme",
+  "bugs": {
+    "url": "https://github.com/saemihemma/watchtower/issues"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

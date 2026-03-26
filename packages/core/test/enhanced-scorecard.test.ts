@@ -310,6 +310,118 @@ describe("Enhanced Scorecard Integration", () => {
     expect(firstCategory.right_cv.stability).toBe("unstable");
   });
 
+  it("should produce right_wins ROPE verdict when right clearly leads", () => {
+    const tasks = [createMockTask("task-1", "routing_accuracy")];
+    const pack = createMockPack();
+
+    const summaries: TaskSideSummary[] = [
+      {
+        task_id: "task-1", task_version: 1, side_id: "left",
+        valid_trial_count: 5, failed_trial_count: 0,
+        task_score: 0.2, trial_scores: [0.2, 0.21, 0.19, 0.2, 0.2],
+        false_positive_count: 0
+      },
+      {
+        task_id: "task-1", task_version: 1, side_id: "right",
+        valid_trial_count: 5, failed_trial_count: 0,
+        task_score: 0.9, trial_scores: [0.9, 0.91, 0.89, 0.9, 0.9],
+        false_positive_count: 0
+      }
+    ];
+
+    const trialResults: TaskTrialResult[] = [];
+    for (const summary of summaries) {
+      for (let i = 0; i < summary.trial_scores.length; i++) {
+        trialResults.push({
+          task_id: summary.task_id, task_version: 1, side_id: summary.side_id,
+          trial_index: i, evaluator_kind: "deterministic",
+          normalized_score: summary.trial_scores[i], false_positive: 0, status: "valid"
+        });
+      }
+    }
+
+    const { scorecard } = computeEnhancedScorecard({
+      tasks, benchmarkPack: pack, summaries, trialResults,
+      config: { ropeEpsilon: 5, bootstrapResamples: 5000, bootstrapSeed: 42 }
+    });
+
+    expect(scorecard.v2.overall_rope_verdict).toBe("right_wins");
+    expect(scorecard.v2.overall_prob_right_superior).toBeGreaterThan(0.95);
+  });
+
+  it("should produce left_wins ROPE verdict when left clearly leads", () => {
+    const tasks = [createMockTask("task-1", "routing_accuracy")];
+    const pack = createMockPack();
+
+    const summaries: TaskSideSummary[] = [
+      {
+        task_id: "task-1", task_version: 1, side_id: "left",
+        valid_trial_count: 5, failed_trial_count: 0,
+        task_score: 0.95, trial_scores: [0.95, 0.94, 0.96, 0.95, 0.95],
+        false_positive_count: 0
+      },
+      {
+        task_id: "task-1", task_version: 1, side_id: "right",
+        valid_trial_count: 5, failed_trial_count: 0,
+        task_score: 0.15, trial_scores: [0.15, 0.14, 0.16, 0.15, 0.15],
+        false_positive_count: 0
+      }
+    ];
+
+    const trialResults: TaskTrialResult[] = [];
+    for (const summary of summaries) {
+      for (let i = 0; i < summary.trial_scores.length; i++) {
+        trialResults.push({
+          task_id: summary.task_id, task_version: 1, side_id: summary.side_id,
+          trial_index: i, evaluator_kind: "deterministic",
+          normalized_score: summary.trial_scores[i], false_positive: 0, status: "valid"
+        });
+      }
+    }
+
+    const { scorecard } = computeEnhancedScorecard({
+      tasks, benchmarkPack: pack, summaries, trialResults,
+      config: { ropeEpsilon: 5, bootstrapResamples: 5000, bootstrapSeed: 42 }
+    });
+
+    expect(scorecard.v2.overall_rope_verdict).toBe("left_wins");
+    expect(scorecard.v2.overall_prob_right_superior).toBeLessThan(0.05);
+  });
+
+  it("should handle single-trial edge case without crashing", () => {
+    const tasks = [createMockTask("task-1", "routing_accuracy")];
+    tasks[0].min_valid_trials = 1;
+    const pack = createMockPack();
+
+    const summaries: TaskSideSummary[] = [
+      {
+        task_id: "task-1", task_version: 1, side_id: "left",
+        valid_trial_count: 1, failed_trial_count: 0,
+        task_score: 0.8, trial_scores: [0.8],
+        false_positive_count: 0
+      },
+      {
+        task_id: "task-1", task_version: 1, side_id: "right",
+        valid_trial_count: 1, failed_trial_count: 0,
+        task_score: 0.3, trial_scores: [0.3],
+        false_positive_count: 0
+      }
+    ];
+
+    const trialResults: TaskTrialResult[] = [
+      { task_id: "task-1", task_version: 1, side_id: "left", trial_index: 0, evaluator_kind: "deterministic", normalized_score: 0.8, false_positive: 0, status: "valid" },
+      { task_id: "task-1", task_version: 1, side_id: "right", trial_index: 0, evaluator_kind: "deterministic", normalized_score: 0.3, false_positive: 0, status: "valid" }
+    ];
+
+    const { winner, scorecard } = computeEnhancedScorecard({
+      tasks, benchmarkPack: pack, summaries, trialResults
+    });
+
+    expect(winner).toBeDefined();
+    expect(scorecard.v2).toBeDefined();
+    expect(scorecard.v2.overall_delta_ci95).toBeDefined();
+  });
+
   it("should preserve v1 backward compatibility", () => {
     const tasks = [createMockTask("task-1", "routing_accuracy")];
     const pack = createMockPack();

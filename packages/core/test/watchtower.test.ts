@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   type Executor,
   compareLibrariesRun,
+  getBenchmarkProfile,
   listProfiles,
   loadRun,
   replaceFromRun,
@@ -23,48 +24,48 @@ function createSkillLibrary(label: string, variant: "strong" | "weak" = "strong"
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `${label}-`));
   tempRoots.push(root);
 
-  const leadProducer =
+  const routingGuide =
     variant === "strong"
       ? [
-          "# Lead Producer",
+          "# Routing Guide",
           "",
           "## What It Is",
-          "Routes work to the smallest sufficient team.",
+          "Helps users discover the best skill and when to use it.",
           "",
           "## What It Is NOT",
-          "Not a specialist role.",
+          "Not a vague catch-all.",
           "",
           "## Use When",
-          "Use when orchestration and stress testing matter.",
+          "Use when you need a clear route or comparison point.",
           "",
           "## Do NOT Use When",
-          "Do not use it for narrow single-owner work.",
+          "Do not use it when another skill already fits better.",
           "",
-          "Devil's Advocate",
-          "Acceptance",
-          "open questions",
+          "best for",
+          "discover",
+          "overlap",
           "next action"
         ].join("\n")
-      : ["# Lead Producer", "", "General help.", "Some advice."].join("\n");
+      : ["# Routing Guide", "", "General help.", "Some advice."].join("\n");
 
-  writeFile(path.join(root, "lead-producer", "SKILL.md"), leadProducer);
+  writeFile(path.join(root, "routing-guide", "SKILL.md"), routingGuide);
   writeFile(
-    path.join(root, "team-product-team", "SKILL.md"),
+    path.join(root, "boundary-guide", "SKILL.md"),
     variant === "strong"
-      ? "# Product Team\n\nWhat It Is\nWhat It Is NOT\nscope\nfeasibility\ntrade-off\nnext action\n"
-      : "# Product Team\n\nIdeas.\n"
+      ? "# Boundary Guide\n\nWhat It Is\nWhat It Is NOT\nscope\nboundaries\noverlap\nresponsibilities\n"
+      : "# Boundary Guide\n\nIdeas.\n"
   );
   writeFile(
-    path.join(root, "team-dev-team", "SKILL.md"),
+    path.join(root, "review-guide", "SKILL.md"),
     variant === "strong"
-      ? "# Dev Team\n\narchitecture\ncode quality\ntests\nverification\nreview\n"
-      : "# Dev Team\n\nCode thoughts.\n"
+      ? "# Review Guide\n\nevidence\nverify\nacceptance\nexamples\nsteps\n"
+      : "# Review Guide\n\nCode thoughts.\n"
   );
   writeFile(
-    path.join(root, "workflow-issue-triage", "SKILL.md"),
+    path.join(root, "handoff-guide", "SKILL.md"),
     variant === "strong"
-      ? "# Issue Triage\n\nhandoff\nnext steps\nowner\ncontext\n"
-      : "# Issue Triage\n\nNotes.\n"
+      ? "# Handoff Guide\n\nhandoff\nnext action\noutput\ncontext\ndeliverable\n"
+      : "# Handoff Guide\n\nNotes.\n"
   );
 
   return root;
@@ -143,7 +144,7 @@ describe("watchtower benchmark core", () => {
     expect(fs.existsSync(run.run_path as string)).toBe(true);
   });
 
-  it("uses bundled profiles and changes the selected task pack", async () => {
+  it("uses the default bundled profile task pack", async () => {
     const leftRoot = createSkillLibrary("profile-left", "weak");
     const rightRoot = createSkillLibrary("profile-right", "strong");
     const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
@@ -152,20 +153,44 @@ describe("watchtower benchmark core", () => {
     const run = await compareLibrariesRun({
       leftRootPath: leftRoot,
       rightRootPath: rightRoot,
-      profileId: "lead-producer",
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
       executor: createMappedExecutor({
-        lp_route_001: { left: 0.25, right: 1 },
-        lp_boundary_001: { left: 0.25, right: 1 },
-        lp_accept_001: { left: 0.25, right: 1 },
-        lp_handoff_001: { left: 0.25, right: 1 }
+        default_usage_001: { left: 0.25, right: 1 },
+        default_discovery_001: { left: 0.25, right: 1 },
+        default_boundary_001: { left: 0.25, right: 1 },
+        default_boundary_002: { left: 0.25, right: 1 },
+        default_review_001: { left: 0.25, right: 1 },
+        default_review_002: { left: 0.25, right: 1 },
+        default_handoff_001: { left: 0.25, right: 1 },
+        default_handoff_002: { left: 0.25, right: 1 },
+        arch_structure_001: { left: 0.25, right: 1 },
+        arch_composition_001: { left: 0.25, right: 1 },
+        hygiene_bloat_001: { left: 0.25, right: 1 },
+        hygiene_replace_001: { left: 0.25, right: 1 },
+        constraint_ambiguity_001: { left: 0.25, right: 1 },
+        constraint_partial_001: { left: 0.25, right: 1 }
       })
     });
 
-    expect(run.profile_id).toBe("lead-producer");
-    expect(run.selected_task_ids).toEqual(["lp_route_001", "lp_boundary_001", "lp_accept_001", "lp_handoff_001"]);
+    expect(run.profile_id).toBe("default");
+    expect(run.selected_task_ids).toEqual([
+      "default_usage_001",
+      "default_discovery_001",
+      "default_boundary_001",
+      "default_boundary_002",
+      "default_review_001",
+      "default_review_002",
+      "default_handoff_001",
+      "default_handoff_002",
+      "arch_structure_001",
+      "arch_composition_001",
+      "hygiene_bloat_001",
+      "hygiene_replace_001",
+      "constraint_ambiguity_001",
+      "constraint_partial_001"
+    ]);
   });
 
   it("returns too_close_to_call when the score delta is below threshold", async () => {
@@ -205,15 +230,18 @@ describe("watchtower benchmark core", () => {
     const run = await compareLibrariesRun({
       leftRootPath: leftRoot,
       rightRootPath: rightRoot,
-      profileId: "lead-producer",
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
       executor: createMappedExecutor({
-        lp_route_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        lp_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        lp_accept_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 0 },
-        lp_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 0, rightFailedTrials: 0 }
+        default_usage_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_discovery_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_boundary_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_review_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_review_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
+        default_handoff_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 }
       })
     });
 
@@ -258,20 +286,57 @@ describe("watchtower benchmark core", () => {
     const run = await compareLibrariesRun({
       leftRootPath: leftRoot,
       rightRootPath: rightRoot,
-      profileId: "lead-producer",
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
       executor: createMappedExecutor({
-        lp_route_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        lp_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        lp_accept_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        lp_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 }
+        default_usage_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_discovery_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_boundary_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_review_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_review_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
+        default_handoff_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 }
       })
     });
 
     expect(run.replace_eligible).toBe(false);
     expect(() => replaceFromRun(dataRoot, run.run_id, "left", true)).toThrow(/not replace-eligible/);
+  });
+
+  it("blocks replace when the losing side is marked remote or ephemeral", async () => {
+    const leftRoot = createSkillLibrary("remote-left", "weak");
+    const rightRoot = createSkillLibrary("remote-right", "strong");
+    const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
+    tempRoots.push(dataRoot);
+
+    const run = await compareLibrariesRun({
+      leftRootPath: leftRoot,
+      rightRootPath: rightRoot,
+      comparisonMode: "same_library",
+      allowlistedParentRoot: os.tmpdir(),
+      dataRoot,
+      executor: createMappedExecutor({
+        default_usage_001: { left: 0.25, right: 1 },
+        default_discovery_001: { left: 0.25, right: 1 },
+        default_boundary_001: { left: 0.25, right: 1 },
+        default_boundary_002: { left: 0.25, right: 1 },
+        default_review_001: { left: 0.25, right: 1 },
+        default_review_002: { left: 0.25, right: 1 },
+        default_handoff_001: { left: 0.25, right: 1 },
+        default_handoff_002: { left: 0.25, right: 1 }
+      })
+    });
+
+    const runPath = path.join(dataRoot, "runs", `${run.run_id}.json`);
+    const persisted = JSON.parse(fs.readFileSync(runPath, "utf8"));
+    persisted.left_side.source_kind = "github";
+    persisted.left_side.replaceable = false;
+    persisted.left_side.root_path = "github://example/reference-library";
+    fs.writeFileSync(runPath, `${JSON.stringify(persisted, null, 2)}\n`, "utf8");
+
+    expect(() => replaceFromRun(dataRoot, run.run_id, "left", true)).toThrow(/remote or ephemeral/);
   });
 
   it("allows archive-first whole-root replace for decisive same-library runs", async () => {
@@ -285,20 +350,23 @@ describe("watchtower benchmark core", () => {
     const run = await compareLibrariesRun({
       leftRootPath: leftRoot,
       rightRootPath: rightRoot,
-      profileId: "lead-producer",
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
       executor: createMappedExecutor({
-        lp_route_001: { left: 0.25, right: 1 },
-        lp_boundary_001: { left: 0.25, right: 1 },
-        lp_accept_001: { left: 0.25, right: 1 },
-        lp_handoff_001: { left: 0.25, right: 1 }
+        default_usage_001: { left: 0.25, right: 1 },
+        default_discovery_001: { left: 0.25, right: 1 },
+        default_boundary_001: { left: 0.25, right: 1 },
+        default_boundary_002: { left: 0.25, right: 1 },
+        default_review_001: { left: 0.25, right: 1 },
+        default_review_002: { left: 0.25, right: 1 },
+        default_handoff_001: { left: 0.25, right: 1 },
+        default_handoff_002: { left: 0.25, right: 1 }
       })
     });
 
     const result = replaceFromRun(dataRoot, run.run_id, "left", true);
-    const replacedSkill = fs.readFileSync(path.join(leftRoot, "lead-producer", "SKILL.md"), "utf8");
+    const replacedSkill = fs.readFileSync(path.join(leftRoot, "routing-guide", "SKILL.md"), "utf8");
 
     expect(result.target_side).toBe("left");
     expect(fs.existsSync(result.archive_dir)).toBe(true);
@@ -344,7 +412,9 @@ describe("watchtower benchmark core", () => {
     tempRoots.push(dataRoot);
 
     expect(validateWorkspacePath(validRoot, os.tmpdir()).toLowerCase()).toContain(path.basename(validRoot).toLowerCase());
-    expect(() => validateWorkspacePath("\\\\server\\share", os.tmpdir())).toThrow(/UNC\/network workspace paths/);
+    expect(() => validateWorkspacePath("\\\\server\\share", os.tmpdir())).toThrow(
+      process.platform === "win32" ? /UNC\/network workspace paths/ : /Workspace path must be absolute/
+    );
 
     await expect(
       compareLibrariesRun({
@@ -360,12 +430,11 @@ describe("watchtower benchmark core", () => {
 
   it("lists the bundled benchmark profiles", () => {
     const profiles = listProfiles();
-    expect(profiles.map((profile) => profile.profile_id)).toEqual([
-      "default",
-      "lead-producer",
-      "team-product-team",
-      "team-dev-team",
-      "workflow-issue-triage"
-    ]);
+    expect(profiles.map((profile) => profile.profile_id)).toEqual(["default"]);
+  });
+
+  it("keeps only the default profile available", () => {
+    expect(getBenchmarkProfile("default").profile_id).toBe("default");
+    expect(() => getBenchmarkProfile("specialized-profile")).toThrow(/Unknown Watchtower profile/);
   });
 });

@@ -133,6 +133,13 @@ function computeOverallScore(categoryScores: CategoryScore[], side: "left" | "ri
   return weightTotal === 0 ? 0 : Number((weightedTotal / weightTotal).toFixed(2));
 }
 
+/**
+ * Build human-readable top reasons explaining the verdict, plus any critical regressions.
+ *
+ * Reasons are generated from category-level deltas sorted by magnitude (up to MAX_CATEGORY_REASONS).
+ * Regressions are generated from critical_regression tasks where the winner regressed.
+ * A confidence note is appended if confidence is not high.
+ */
 function buildTopReasons(
   winner: ComparisonWinner,
   categoryScores: CategoryScore[],
@@ -195,6 +202,12 @@ function buildTopReasons(
   return { reasons: reasons.slice(0, MAX_REASONS), regressions };
 }
 
+/**
+ * Determine the comparison winner using three sequential gates:
+ * 1. Confidence gate — low confidence → too_close_to_call
+ * 2. Critical regression gate — winner regressed on critical task → too_close_to_call
+ * 3. Delta threshold — absolute delta must exceed WINNER_DELTA_THRESHOLD (5 points)
+ */
 function determineWinner(
   leftScore: number,
   rightScore: number,
@@ -304,6 +317,15 @@ export function computeRecommendedAction(
   return "keep_separate";
 }
 
+/**
+ * Generate Devil's Advocate counter-arguments challenging the verdict.
+ *
+ * Returns one of three verdicts:
+ * - "clear" — no blocking concerns; safe to act on the result
+ * - "caution" — result is valid but margin is modest (< CAUTION_MARGIN points)
+ * - "block_replace" — replacement should be blocked (draws, low confidence,
+ *   regressions, or cross-library comparison)
+ */
 export function computeDevilsAdvocate(
   winner: ComparisonWinner,
   comparisonMode: ComparisonMode,

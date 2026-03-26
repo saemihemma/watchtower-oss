@@ -1,12 +1,44 @@
 {
-  "name": "@watchtower/runner",
-  "private": true,
+  "name": "@watchtower-bench/runner",
+  "version": "1.0.0",
+  "description": "CLI runner for Watchtower — compare, batch, calibrate, and tournament commands for benchmarking markdown skill libraries.",
   "type": "module",
+  "bin": {
+    "watchtower": "./dist/index.js"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts"
   },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Sæmundur",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saemihemma/watchtower.git",
+    "directory": "apps/runner"
+  },
+  "homepage": "https://github.com/saemihemma/watchtower#readme",
+  "bugs": {
+    "url": "https://github.com/saemihemma/watchtower/issues"
+  },
+  "keywords": [
+    "benchmark",
+    "cli",
+    "skill-library",
+    "watchtower"
+  ],
   "dependencies": {
-    "@watchtower/core": "*"
+    "@watchtower-bench/core": "^1.0.0"
   }
 }
