@@ -29,6 +29,8 @@ export type CompareLibrariesRunInput = {
   updateElo?: boolean;
   /** Optional IRT calibration report. When provided, IRT weights are applied to the scorecard. */
   irtCalibration?: IRTCalibrationReport;
+  /** Seed for prompt template randomization. */
+  seed?: number;
 };
 
 export type ShowRunResult = {
@@ -230,7 +232,8 @@ export async function compareLibrariesRun(input: CompareLibrariesRunInput): Prom
     profileId: input.profileId,
     leftLabel: input.leftLabel,
     rightLabel: input.rightLabel,
-    irtCalibration: input.irtCalibration
+    irtCalibration: input.irtCalibration,
+    seed: input.seed
   });
 
   const persistedRun: ComparisonRun = {

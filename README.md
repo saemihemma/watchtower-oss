@@ -70,13 +70,14 @@ Watchtower benchmarks markdown skill libraries. It does not score arbitrary code
 
 ## Platform Support
 
-v1.0 supports macOS and Linux. Windows is not currently supported — source resolution and snapshot logic use POSIX paths.
+v1.0 supports macOS, Linux, and Windows. The CLI resolves paths cross-platform and the Claude executor uses `shell: true` for Windows compatibility.
 
 ## Commands
 
 | Command | Purpose |
 |---------|---------|
 | `compare <left> <right>` | Run a benchmark comparison |
+| `composite <left> <right>` | Run all profiles and compute weighted composite score |
 | `tournament <lib1> <lib2> [...]` | Single-elimination bracket for 2–16 libraries |
 | `batch <left> <right>` | Accumulate trial data for IRT calibration |
 | `calibrate --batch <id>` | Fit IRT model to batch data |
@@ -111,47 +112,44 @@ See [docs/source-inputs.md](./docs/source-inputs.md) for the full source-resolut
 
 ## Benchmark Profiles
 
-The default profile evaluates 14 tasks across 7 weighted categories:
+The default profile tests process discipline — whether skills improve LLM engineering output. It evaluates 8 tasks across 3 weighted categories:
 
 | Category | Weight | Tasks |
 |----------|--------|-------|
-| Review Quality | 20 | Evidence bar, concrete workflow |
-| Routing Accuracy | 17 | Usage guidance, discoverability |
-| Boundary Clarity | 15 | What-it-is/not, ownership separation |
-| Handoff Quality | 15 | Next action, context preservation |
-| System Architecture | 15 | Layering/coherence, composition |
-| Code Hygiene | 10 | Bloat detection, replace discipline |
-| Constraint Handling | 8 | Ambiguity protocol, graceful degradation |
+| Structured Reasoning | 35 | Cross-domain conflict resolution, ambiguous production investigation |
+| Scope Discipline | 35 | Overbroad request scoping, scope creep defense |
+| Handoff Quality | 30 | Specialist handoff, investigation handoff, cross-team synthesis, routing |
 
-Each task uses a 0–4 rubric scale. Scores are normalized to [0, 1] for aggregation.
+Each task uses a 0–4 rubric scale. Scores are normalized to [0, 1] for aggregation. A token tax penalizes excessively verbose output.
 
-### Bundled Profiles
+### Built-in Profiles
 
-Six profiles ship with Watchtower. Each focused profile is standalone — it defines its own categories, weights, and tasks.
+Four profiles ship with Watchtower:
 
-| Profile | File | Tasks | Focus |
-|---------|------|-------|-------|
-| Default | built-in | 14, 7 categories | General-purpose skill quality |
-| Planning | `profiles/planning.json` | 8, 4 categories | Decomposition, scoping, sequencing |
-| Code Hygiene | `profiles/code-hygiene.json` | 8, 5 categories | Bloat, replace discipline, naming |
-| Architecture | `profiles/architecture.json` | 8, 5 categories | Layering, dependencies, composition |
-| Complex Coding | `profiles/complex-coding.json` | 8, 5 categories | Error handling, edge cases, state |
-| End-to-End | `profiles/end-to-end.json` | 20, 10 categories | Composite: extends default + 3 domains |
+| Profile | Tasks | Focus |
+|---------|-------|-------|
+| `default` | 8 process tasks, 3 categories | Process discipline: routing, scope, evidence, handoff |
+| `library-quality` | 8 doc-review tasks, 4 categories | Documentation quality: routing clarity, boundaries, evidence bars |
+| `friction` | 3 simplicity tasks, 1 category | Simplicity check: skills don't over-complicate simple work |
+| `grounded` | 4 deterministic tasks, 2 categories | Objective accuracy: logic, causality, code debugging |
 
 ```bash
-npm run watchtower -- compare ./lib-a ./lib-b --profile-file ./profiles/architecture.json --executor mock
+# Run a specific profile
+npm run watchtower -- compare ./lib-a ./lib-b --profile friction --executor mock
+
+# Run all profiles and get a weighted composite score
+npm run watchtower -- composite ./lib-a ./lib-b --executor mock
 ```
+
+Additional focused profiles are available as JSON files in `profiles/` (planning, code-hygiene, architecture, complex-coding, end-to-end).
+
+### Two-Phase Blind Harness
+
+When an executor supports it, Watchtower uses a two-phase evaluation: the performer generates output without seeing the rubric, then a separate judge call scores both outputs pairwise with presentation order randomized. This prevents the performer from gaming the rubric and eliminates position bias.
 
 ### Custom Profiles
 
-Profiles are JSON files loaded with `--profile-file`. Six authoring patterns are supported:
-
-1. **Default profile** — no flags needed, 14 tasks run automatically.
-2. **Focused bundled profile** — point `--profile-file` at any JSON in `profiles/`.
-3. **Category subset** — add `--categories code_hygiene,system_architecture` to any profile.
-4. **Standalone domain profile** — define your own categories, weights, tasks, and mock cues from scratch.
-5. **Extend default** — set `"extends_default": true` to inherit all 14 default tasks, then add or override.
-6. **Fast smoke test** — set `"default_trials_per_side": 3` for quick directional checks.
+Profiles are JSON files loaded with `--profile-file`. Authoring patterns include standalone profiles, extending the default with `"extends_default": true`, subsetting categories with `--categories`, and adjusting trial counts.
 
 See [examples/game-design-profile.json](./examples/game-design-profile.json) for a complete standalone example and [docs/profile-authoring.md](./docs/profile-authoring.md) for the full authoring guide.
 
@@ -389,7 +387,6 @@ See [docs/architecture.md](./docs/architecture.md) for the system diagram and mo
 - Elo is a convenience signal, not a scientific leaderboard.
 - The bundled profile is a generic benchmark, not universal truth.
 - Cue-matching (mock and C-V construction phase) has a 25–35% false-positive rate for keyword-heavy bundles. Semantic evaluation is planned.
-- v1.0 is macOS/Linux only. Windows support is planned.
 
 ## License
 

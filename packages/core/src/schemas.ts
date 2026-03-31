@@ -14,7 +14,12 @@ export const BUILTIN_CATEGORIES = [
   "handoff_quality",
   "system_architecture",
   "code_hygiene",
-  "constraint_handling"
+  "constraint_handling",
+  "structured_reasoning",
+  "scope_discipline",
+  "reasoning_accuracy",
+  "engineering_accuracy",
+  "friction"
 ] as const;
 
 export type BuiltinBenchmarkCategory = (typeof BUILTIN_CATEGORIES)[number];
@@ -141,6 +146,8 @@ export type BenchmarkTask = {
   trials_per_side: number;
   prompt_text: string;
   rubric_text: string | null;
+  /** For deterministic tasks: the expected correct answer for answer matching. */
+  expected_answer?: string;
   extensions?: TaskExtensions;
 };
 
@@ -187,6 +194,8 @@ export type TaskTrialResult = {
   false_positive: 0 | 1;
   status: "valid" | "failed";
   reason?: string;
+  /** Output token count for token tax calculation. */
+  token_count?: number;
   extension_metadata?: Record<string, unknown>;
 };
 
@@ -302,11 +311,48 @@ export type ExecutorOutput = {
   falsePositive?: 0 | 1;
   status: "valid" | "failed";
   reason?: string;
+  /** Output token count for token tax calculation. */
+  tokenCount?: number;
+};
+
+// --- Two-phase blind harness types ---
+
+export type PerformerInput = {
+  sideId: "left" | "right";
+  task: BenchmarkTask;
+  trialIndex: number;
+  bundleDir: string;
+  promptText: string;
+  // Note: NO rubricText — performer must not see the rubric.
+};
+
+export type PerformerOutput = {
+  text: string;
+  tokenCount?: number;
+};
+
+export type JudgeInput = {
+  task: BenchmarkTask;
+  outputA: string;
+  outputB: string;
+  rubricText: string;
+  /** True when output A is from the left side. Used to map scores back correctly. */
+  aIsLeft: boolean;
+};
+
+export type JudgeVerdict = {
+  aScore: number;
+  bScore: number;
+  reasoning?: string;
 };
 
 export type Executor = {
   version: string;
   run(input: ExecutorInput): Promise<ExecutorOutput>;
+  /** Two-phase: performer generates output without seeing the rubric. */
+  perform?(input: PerformerInput): Promise<PerformerOutput>;
+  /** Two-phase: judge scores both outputs with rubric, pairwise comparison. */
+  judge?(input: JudgeInput): Promise<JudgeVerdict>;
 };
 
 export type ProviderDiagnostics = {

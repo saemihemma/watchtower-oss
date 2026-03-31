@@ -146,7 +146,7 @@ flowchart LR
 
 ### Runner
 
-`apps/runner` parses CLI flags, selects the executor, prints diagnostics, and dispatches into `packages/core`. It does not own business rules. Commands: `profiles`, `compare`, `tournament`, `show`, `replace`, `leaderboard`, `history`.
+`apps/runner` parses CLI flags, selects the executor, prints diagnostics, and dispatches into `packages/core`. It does not own business rules. Commands: `profiles`, `compare`, `composite`, `tournament`, `batch`, `calibrate`, `show`, `replace`, `leaderboard`, `history`.
 
 ### Source Resolver
 
@@ -158,7 +158,14 @@ flowchart LR
 
 ### Benchmark Selection
 
-`packages/core/src/builtin-benchmark.ts` defines the bundled benchmark profile: 14 tasks across 7 weighted categories (routing accuracy, boundary clarity, review quality, handoff quality, system architecture, code hygiene, constraint handling). Scenarios are defined in `packages/core/src/schemas.ts` and influence comparison mode plus recommended profiles.
+`packages/core/src/builtin-benchmark.ts` defines four built-in benchmark profiles:
+
+- **default** (process discipline): 8 tasks across 3 categories (structured_reasoning 35%, scope_discipline 35%, handoff_quality 30%). Tests whether skills improve LLM engineering output.
+- **library-quality** (documentation review): 8 tasks across 4 categories. Diagnostic profile for skill file organization.
+- **friction** (simplicity check): 3 tasks, 1 category. Ensures skills don't over-complicate simple work.
+- **grounded** (objective accuracy): 4 deterministic tasks across 2 categories (reasoning_accuracy 40%, engineering_accuracy 60%). Known correct answers — no LLM-as-Judge subjectivity.
+
+Scenarios are defined in `packages/core/src/schemas.ts` and influence comparison mode plus recommended profiles.
 
 `packages/core/src/profile-loader.ts` provides the extensibility layer: custom profiles can be loaded from JSON files on disk, validated, and registered into the profile registry. Custom profiles define their own categories, weights, and tasks. The `extends_default` flag allows inheriting built-in tasks while adding custom ones. Category subsetting (`subsetProfileByCategories`) allows running a focused slice of any profile.
 
@@ -174,7 +181,7 @@ The runner selects a provider, resolves the launch shell for the host OS, and pa
 
 ### Scoring and Stats
 
-`packages/core/src/verdict.ts` computes the baseline scorecard, winner, recommended action, and Devil's Advocate result.
+`packages/core/src/verdict.ts` computes the baseline scorecard, winner, recommended action, Devil's Advocate result, and token tax penalties for excessively verbose output. `packages/core/src/composite.ts` provides cross-profile weighted composite scoring.
 
 `packages/core/src/stats.ts` and `packages/core/src/stats-verdict.ts` layer in:
 

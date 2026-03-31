@@ -6,6 +6,7 @@ import {
   computeReplaceEligible,
   computeRecommendedAction,
   computeDevilsAdvocate,
+  applyTokenTax,
   type BenchmarkTask,
   type BenchmarkPack,
   type TaskSideSummary,
@@ -344,7 +345,7 @@ describe("computeDevilsAdvocate", () => {
   it("returns block_replace when regressions exist", () => {
     const withRegression: Scorecard = {
       ...clearScorecard,
-      regressions: ["Right regressed on critical task default_review_001 by -20.00 points."]
+      regressions: ["Right regressed on critical task functional_investigation_001 by -20.00 points."]
     };
     const da = computeDevilsAdvocate("right", "same_library", withRegression);
     expect(da.verdict).toBe("block_replace");
@@ -367,5 +368,36 @@ describe("computeDevilsAdvocate", () => {
     };
     const da = computeDevilsAdvocate("right", "same_library", lowConfidence);
     expect(da.verdict).toBe("block_replace");
+  });
+});
+
+describe("applyTokenTax", () => {
+  it("returns raw score when token count is at or below baseline", () => {
+    expect(applyTokenTax(0.8, 800)).toBe(0.8);
+    expect(applyTokenTax(0.8, 500)).toBe(0.8);
+    expect(applyTokenTax(0.8, 0)).toBe(0.8);
+  });
+
+  it("returns raw score when token count is null or undefined", () => {
+    expect(applyTokenTax(0.8, null)).toBe(0.8);
+    expect(applyTokenTax(0.8, undefined)).toBe(0.8);
+  });
+
+  it("applies linear penalty above baseline", () => {
+    // 1000 tokens over baseline = 0.0001 * 1000 = 10% penalty
+    const result = applyTokenTax(1.0, 1800, 800);
+    expect(result).toBeCloseTo(0.9, 5);
+  });
+
+  it("caps penalty at TOKEN_TAX_CAP", () => {
+    // 100000 tokens over baseline would be 1000% penalty, but capped at 50%
+    const result = applyTokenTax(1.0, 100800, 800, 0.5);
+    expect(result).toBeCloseTo(0.5, 5);
+  });
+
+  it("scales with raw score", () => {
+    // 2000 tokens over baseline = 0.0001 * 2000 = 20% penalty on 0.8 raw
+    const result = applyTokenTax(0.8, 2800, 800);
+    expect(result).toBeCloseTo(0.8 * 0.8, 5);
   });
 });

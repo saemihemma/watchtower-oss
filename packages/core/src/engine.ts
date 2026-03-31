@@ -12,12 +12,15 @@ import {
   type Executor,
   type IRTCalibrationReport,
   type IRTWeightOverride,
+  type TaskTrialResult,
   SCHEMA_VERSION
 } from "./schemas.js";
 import {
   COLLAPSE_PRIMITIVE_FLOOR,
-  COLLAPSE_COMPOSED_CEILING
+  COLLAPSE_COMPOSED_CEILING,
+  DEFAULT_RANDOMIZATION_SEED
 } from "./constants.js";
+import { mulberry32 } from "./math-helpers.js";
 import { enrichCompositionMetadata } from "./composition-scorer.js";
 import { scoreWithExtensions } from "./extension-scorer.js";
 import { createSnapshot, type SnapshotResult } from "./snapshots.js";
@@ -28,6 +31,7 @@ import {
   type ResolvedSource
 } from "./source-resolver.js";
 import {
+  applyTokenTax,
   computeActionOffers,
   computeDevilsAdvocate,
   computeRecommendedAction,
@@ -49,6 +53,31 @@ export const DEFAULT_IGNORE_GLOBS = [
   "watchtower-data/**"
 ];
 
+// --- Prompt template resolution ---
+
+/** Template variable pools for seeded randomization of process task prompts. */
+const TEMPLATE_POOLS: Record<string, string[]> = {
+  domain: ["e-commerce", "fintech", "healthcare", "gaming", "logistics", "media streaming", "edtech", "social platform"],
+  tech_stack: ["Node.js/React", "Python/Django", "Go/gRPC", "Java/Spring", "Rust/Axum", "C#/.NET", "Ruby on Rails"],
+  team_size: ["3 engineers", "4 engineers", "6 engineers", "8 engineers", "2 engineers and a tech lead"],
+  timeline: ["4 weeks", "6 weeks", "3 sprints", "8 weeks", "one quarter"],
+  service: ["payment service", "notification service", "search service", "auth service", "analytics pipeline"]
+};
+
+/**
+ * Resolve {{variable}} template placeholders in prompt text using a seeded PRNG.
+ * Same seed + same taskIndex = same resolved text (deterministic).
+ */
+export function resolvePromptTemplates(promptText: string, seed: number, taskIndex: number): string {
+  const rng = mulberry32(seed + taskIndex * 7919); // Prime offset per task
+  return promptText.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+    const pool = TEMPLATE_POOLS[key];
+    if (!pool || pool.length === 0) return `{{${key}}}`;
+    const index = Math.floor(rng() * pool.length);
+    return pool[index];
+  });
+}
+
 export type CompareLibrariesOptions = {
   allowlistedParentRoot: string;
   snapshotsRoot: string;
@@ -58,6 +87,8 @@ export type CompareLibrariesOptions = {
   comparisonMode: ComparisonMode;
   comparisonScenario?: ComparisonScenario;
   profileId?: string;
+  /** Seed for prompt template randomization. Default: DEFAULT_RANDOMIZATION_SEED. */
+  seed?: number;
   leftLabel?: string;
   rightLabel?: string;
   irtCalibration?: IRTCalibrationReport;
@@ -221,36 +252,107 @@ async function compareLibrariesInner(
     rightSource.sourceId
   );
 
-  const taskTrialResults: ComparisonRun["task_trial_results"] = [];
-  for (const task of profile.tasks) {
-    for (const side of [left, right] as const) {
-      const trialCount = task.trials_per_side ?? 5;
+  const taskTrialResults: TaskTrialResult[] = [];
+  const useTwoPhase = typeof options.executor.perform === "function" && typeof options.executor.judge === "function";
+  const seed = options.seed ?? DEFAULT_RANDOMIZATION_SEED;
+
+  for (let taskIdx = 0; taskIdx < profile.tasks.length; taskIdx += 1) {
+    const task = profile.tasks[taskIdx];
+    const resolvedPrompt = resolvePromptTemplates(task.prompt_text, seed, taskIdx);
+    const trialCount = task.trials_per_side ?? 5;
+
+    if (useTwoPhase && task.rubric_text) {
+      // Two-phase blind harness: performer never sees rubric, judge sees both outputs.
       for (let trialIndex = 1; trialIndex <= trialCount; trialIndex += 1) {
-        const executorInput = {
-          sideId: side.side.side_id as "left" | "right",
+        const leftPerformerOutput = await options.executor.perform!({
+          sideId: "left",
           task,
           trialIndex,
-          bundleDir: side.filesRoot,
-          promptText: task.prompt_text,
-          rubricText: task.rubric_text
-        };
-        const baseOutput = await options.executor.run(executorInput);
-        const { result: finalOutput, metadata } = await scoreWithExtensions(
-          executorInput,
-          baseOutput
-        );
+          bundleDir: left.filesRoot,
+          promptText: resolvedPrompt
+        });
+        const rightPerformerOutput = await options.executor.perform!({
+          sideId: "right",
+          task,
+          trialIndex,
+          bundleDir: right.filesRoot,
+          promptText: resolvedPrompt
+        });
+
+        // Randomize presentation order to prevent position bias.
+        const aIsLeft = trialIndex % 2 === 1;
+        const outputA = aIsLeft ? leftPerformerOutput.text : rightPerformerOutput.text;
+        const outputB = aIsLeft ? rightPerformerOutput.text : leftPerformerOutput.text;
+
+        const judgeVerdict = await options.executor.judge!({
+          task,
+          outputA,
+          outputB,
+          rubricText: task.rubric_text,
+          aIsLeft
+        });
+
+        const leftScore = aIsLeft ? judgeVerdict.aScore : judgeVerdict.bScore;
+        const rightScore = aIsLeft ? judgeVerdict.bScore : judgeVerdict.aScore;
+        const leftTokens = leftPerformerOutput.tokenCount;
+        const rightTokens = rightPerformerOutput.tokenCount;
+
         taskTrialResults.push({
           task_id: task.task_id,
           task_version: task.task_version,
-          side_id: side.side.side_id,
+          side_id: "left",
           trial_index: trialIndex,
           evaluator_kind: task.evaluator_kind,
-          normalized_score: finalOutput.normalizedScore,
-          false_positive: finalOutput.falsePositive ?? 0,
-          status: finalOutput.status,
-          reason: finalOutput.reason,
-          extension_metadata: metadata
+          normalized_score: applyTokenTax(leftScore, leftTokens),
+          false_positive: 0,
+          status: "valid",
+          token_count: leftTokens
         });
+        taskTrialResults.push({
+          task_id: task.task_id,
+          task_version: task.task_version,
+          side_id: "right",
+          trial_index: trialIndex,
+          evaluator_kind: task.evaluator_kind,
+          normalized_score: applyTokenTax(rightScore, rightTokens),
+          false_positive: 0,
+          status: "valid",
+          token_count: rightTokens
+        });
+      }
+    } else {
+      // Legacy single-call path: executor sees prompt + rubric in one call.
+      for (const side of [left, right] as const) {
+        for (let trialIndex = 1; trialIndex <= trialCount; trialIndex += 1) {
+          const executorInput = {
+            sideId: side.side.side_id as "left" | "right",
+            task,
+            trialIndex,
+            bundleDir: side.filesRoot,
+            promptText: resolvedPrompt,
+            rubricText: task.rubric_text
+          };
+          const baseOutput = await options.executor.run(executorInput);
+          const { result: finalOutput, metadata } = await scoreWithExtensions(
+            executorInput,
+            baseOutput
+          );
+          const rawScore = finalOutput.normalizedScore;
+          const tokenCount = baseOutput.tokenCount;
+          taskTrialResults.push({
+            task_id: task.task_id,
+            task_version: task.task_version,
+            side_id: side.side.side_id,
+            trial_index: trialIndex,
+            evaluator_kind: task.evaluator_kind,
+            normalized_score: rawScore != null ? applyTokenTax(rawScore, tokenCount) : null,
+            false_positive: finalOutput.falsePositive ?? 0,
+            status: finalOutput.status,
+            reason: finalOutput.reason,
+            token_count: tokenCount,
+            extension_metadata: metadata
+          });
+        }
       }
     }
   }

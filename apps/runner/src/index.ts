@@ -33,11 +33,14 @@ import {
   writeCalibrationReport,
   writeJson,
   ensureDir,
+  computeCompositeScore,
+  DEFAULT_COMPOSITE_WEIGHTS,
   type ExecutorKind,
   type ComparisonScenario,
   type ComparisonRun,
   type BatchOutput,
   type ExternalProfileDefinition,
+  type ProfileResult,
   BATCH_CONFIRM_THRESHOLD,
   BATCH_MAX_PARALLEL,
   BATCH_MAX_RUNS,
@@ -124,10 +127,10 @@ function printText(value: string): void {
 
 function renderProfiles(): string {
   const diagnostics = collectDiagnostics();
-  const profileLines = listProfiles().map((profile) =>
+  const profileLines = listProfiles().map((profile: { profile_id: string; is_default: boolean; description: string }) =>
     `- ${profile.profile_id}${profile.is_default ? " (default)" : ""}: ${profile.description}`
   );
-  const providerLines = Object.values(diagnostics.providers).flatMap((provider) => [
+  const providerLines = (Object.values(diagnostics.providers) as Array<{ provider: string; ready: boolean; launch_configured: boolean; launch_shell: string; launcher: string | null; launcher_path: string | null }>).flatMap((provider) => [
     `- ${provider.provider}: ready=${provider.ready ? "yes" : "no"}, configured=${provider.launch_configured ? "yes" : "no"}, shell=${provider.launch_shell}, launcher=${provider.launcher ?? "unknown"}, resolved=${provider.launcher_path ?? "not found"}`
   ]);
 
@@ -205,9 +208,9 @@ function resolveScenario(flags: Map<string, string>): {
   const scenarioFlag = flags.get("scenario") as ComparisonScenario | undefined;
 
   if (scenarioFlag) {
-    const meta = SCENARIO_REGISTRY.find((s) => s.scenario === scenarioFlag);
+    const meta = SCENARIO_REGISTRY.find((s: { scenario: string }) => s.scenario === scenarioFlag);
     if (!meta) {
-      const valid = SCENARIO_REGISTRY.map((s) => s.scenario).join(", ");
+      const valid = SCENARIO_REGISTRY.map((s: { scenario: string }) => s.scenario).join(", ");
       throw new Error(`Unknown scenario '${scenarioFlag}'. Valid: ${valid}`);
     }
     // Scenario implies mode, but explicit --same-library overrides
@@ -239,7 +242,7 @@ async function run(): Promise<void> {
         });
       } else {
         const scenarioLines = SCENARIO_REGISTRY.map(
-          (s) => `- ${s.scenario} (${s.implied_mode}): ${s.description}`
+          (s: { scenario: string; implied_mode: string; description: string }) => `- ${s.scenario} (${s.implied_mode}): ${s.description}`
         );
         printText([
           renderProfiles(),
@@ -283,6 +286,13 @@ async function run(): Promise<void> {
         }
       }
 
+      const compareSeed = parsed.flags.has("seed")
+        ? parseInt(parsed.flags.get("seed")!, 10)
+        : undefined;
+      if (compareSeed !== undefined && !Number.isFinite(compareSeed)) {
+        throw new Error(`Invalid seed value '${parsed.flags.get("seed")}'. Must be a finite number.`);
+      }
+
       const runBundle = await compareLibrariesRun({
         leftRootPath: leftPath,
         rightRootPath: rightPath,
@@ -295,7 +305,8 @@ async function run(): Promise<void> {
         dataRoot: context.dataRoot,
         executor: getExecutor(context.executorKind),
         updateElo: parsed.flags.get("no-elo") !== "true",
-        irtCalibration
+        irtCalibration,
+        seed: compareSeed
       });
 
       if (jsonMode) {
@@ -357,7 +368,7 @@ async function run(): Promise<void> {
     case "leaderboard": {
       const ledger = loadEloLedger(context.dataRoot);
       if (jsonMode) {
-        printJson(ledger.entries.sort((a, b) => b.elo - a.elo));
+        printJson(ledger.entries.sort((a: { elo: number }, b: { elo: number }) => b.elo - a.elo));
       } else {
         printText(renderLeaderboard(ledger));
       }
@@ -401,7 +412,7 @@ async function run(): Promise<void> {
         dataRoot: context.dataRoot,
         updateElo: parsed.flags.get("no-elo") !== "true",
         randomSeed: seed,
-        onProgress: jsonMode ? undefined : (msg) => process.stderr.write(`  ${msg}\n`)
+        onProgress: jsonMode ? undefined : (msg: string) => process.stderr.write(`  ${msg}\n`)
       });
 
       if (jsonMode) {
@@ -459,6 +470,13 @@ async function run(): Promise<void> {
       const sigintHandler = () => { stopRequested = true; };
       process.on("SIGINT", sigintHandler);
 
+      const batchSeed = parsed.flags.has("seed")
+        ? parseInt(parsed.flags.get("seed")!, 10)
+        : undefined;
+      if (batchSeed !== undefined && !Number.isFinite(batchSeed)) {
+        throw new Error(`Invalid seed value '${parsed.flags.get("seed")}'. Must be a finite number.`);
+      }
+
       const batchStartTime = Date.now();
 
       try {
@@ -467,7 +485,7 @@ async function run(): Promise<void> {
           parallel,
           retryOnFail: 1,
           shouldStop: () => stopRequested,
-          onRunComplete: (runId, index, total) => {
+          onRunComplete: (runId: string, index: number, total: number) => {
             if (!jsonMode) {
               const elapsed = ((Date.now() - batchStartTime) / 1000).toFixed(1);
               process.stderr.write(`[${index}/${total}] Run ${runId} completed (${elapsed}s)\n`);
@@ -485,7 +503,8 @@ async function run(): Promise<void> {
               allowlistedParentRoot: context.allowlistedParentRoot,
               dataRoot: context.dataRoot,
               executor: getExecutor(context.executorKind),
-              updateElo: parsed.flags.get("no-elo") !== "true"
+              updateElo: parsed.flags.get("no-elo") !== "true",
+              seed: batchSeed
             });
             return run.run_id;
           }
@@ -500,7 +519,7 @@ async function run(): Promise<void> {
           left: leftPath,
           right: rightPath,
           createdAt: new Date().toISOString(),
-          runs: batchResult.runIds.map(runId => {
+          runs: batchResult.runIds.map((runId: string) => {
             const run = loadRun(context.dataRoot, runId);
             return { runId, taskTrialResults: run.task_trial_results };
           }),
@@ -623,6 +642,81 @@ async function run(): Promise<void> {
       return;
     }
 
+    case "composite": {
+      const leftPath = parsed.flags.get("left") ?? parsed.positionals[0];
+      const rightPath = parsed.flags.get("right") ?? parsed.positionals[1];
+      if (!leftPath || !rightPath) {
+        throw new Error(
+          "Missing composite paths. Use: composite <leftPath> <rightPath> [--executor <mock|codex|claude>]"
+        );
+      }
+
+      requireRealExecutorReady(context.executorKind);
+      const { comparisonMode, comparisonScenario } = resolveScenario(parsed.flags);
+      const compositeSeed = parsed.flags.has("seed")
+        ? parseInt(parsed.flags.get("seed")!, 10)
+        : undefined;
+
+      const profileIds = DEFAULT_COMPOSITE_WEIGHTS
+        .map((w: { profileId: string }) => w.profileId)
+        .filter((id: string) => id !== "efficiency"); // efficiency is derived, not a real profile
+
+      const profileResults: ProfileResult[] = [];
+      for (const profileId of profileIds) {
+        try {
+          const run = await compareLibrariesRun({
+            leftRootPath: leftPath,
+            rightRootPath: rightPath,
+            profileId,
+            comparisonMode,
+            comparisonScenario,
+            leftLabel: parsed.flags.get("left-label") ?? undefined,
+            rightLabel: parsed.flags.get("right-label") ?? undefined,
+            allowlistedParentRoot: context.allowlistedParentRoot,
+            dataRoot: context.dataRoot,
+            executor: getExecutor(context.executorKind),
+            updateElo: parsed.flags.get("no-elo") !== "true",
+            seed: compositeSeed
+          });
+          profileResults.push({
+            profileId,
+            leftScore: run.scorecard.left_score,
+            rightScore: run.scorecard.right_score
+          });
+          if (!jsonMode) {
+            process.stderr.write(`  [composite] ${profileId}: left=${run.scorecard.left_score}, right=${run.scorecard.right_score}\n`);
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!jsonMode) {
+            process.stderr.write(`  [composite] ${profileId}: SKIPPED — ${msg}\n`);
+          }
+        }
+      }
+
+      const composite = computeCompositeScore(profileResults);
+
+      if (jsonMode) {
+        printJson(composite);
+      } else {
+        const lines = [
+          "# Watchtower Composite Score",
+          "",
+          "| Profile | Left | Right | Weight |",
+          "|---------|------|-------|--------|",
+          ...composite.profileResults.map((r: ProfileResult) => {
+            const w = composite.weights.find((w: { profileId: string }) => w.profileId === r.profileId);
+            return `| ${r.profileId} | ${r.leftScore.toFixed(2)} | ${r.rightScore.toFixed(2)} | ${((w?.weight ?? 0) * 100).toFixed(0)}% |`;
+          }),
+          ...(composite.excluded.length > 0 ? [`| (excluded: ${composite.excluded.join(", ")}) | — | — | renormalized |`] : []),
+          "",
+          `**Final:** Left = ${composite.leftFinal}, Right = ${composite.rightFinal}, Delta = ${composite.delta}`
+        ];
+        printText(lines.join("\n"));
+      }
+      return;
+    }
+
     case "help": {
       printText([
         "# Watchtower CLI",
@@ -638,6 +732,7 @@ async function run(): Promise<void> {
         "    --left-label <name>        Label for left side",
         "    --right-label <name>       Label for right side",
         "    --executor <mock|codex|claude>  Executor type (default: mock)",
+        "    --seed <number>            Randomization seed for prompt templates (default: 42)",
         "    --irt <path>               Apply IRT calibration weights from file",
         "    --no-elo                   Skip Elo rating update",
         "    --json                     Output as JSON",
@@ -650,7 +745,14 @@ async function run(): Promise<void> {
         "    --scenario <type>          Comparison scenario",
         "    --same-library             Treat as same library",
         "    --executor <mock|codex|claude>  Executor type (default: mock)",
+        "    --seed <number>            Randomization seed for prompt templates (default: 42)",
         "    --confirm                  Required for real executors with >10 runs",
+        "    --no-elo                   Skip Elo rating updates",
+        "  composite <left> <right>     Run all profiles and compute weighted composite score",
+        "    --executor <mock|codex|claude>  Executor type (default: mock)",
+        "    --seed <number>            Randomization seed for prompt templates (default: 42)",
+        "    --scenario <type>          Comparison scenario",
+        "    --same-library             Treat as same library",
         "    --no-elo                   Skip Elo rating updates",
         "  calibrate <batch-id>         Run IRT calibration on batch data",
         "    --batch <batch-id>         Batch to calibrate (alternative to positional)",
@@ -693,7 +795,7 @@ async function run(): Promise<void> {
 
     default:
       throw new Error(
-        `Unknown command: ${parsed.command}. Run 'help' for usage. Available: profiles, compare, batch, calibrate, show, replace, tournament, leaderboard, history, help`
+        `Unknown command: ${parsed.command}. Run 'help' for usage. Available: profiles, compare, composite, batch, calibrate, show, replace, tournament, leaderboard, history, help`
       );
   }
 }

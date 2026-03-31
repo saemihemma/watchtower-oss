@@ -76,10 +76,10 @@ describe("provider executors", () => {
     const result = await executor.run({
       sideId: "left",
       task: {
-        task_id: "default_usage_001",
+        task_id: "functional_multidomain_001",
         task_version: 1,
         family: "default",
-        category: "routing_accuracy",
+        category: "structured_reasoning",
         critical_regression: false,
         evaluator_kind: "rubric",
         priority: 50,
@@ -102,10 +102,10 @@ describe("provider executors", () => {
     const result = await executor.run({
       sideId: "right",
       task: {
-        task_id: "default_usage_001",
+        task_id: "functional_multidomain_001",
         task_version: 1,
         family: "default",
-        category: "routing_accuracy",
+        category: "structured_reasoning",
         critical_regression: false,
         evaluator_kind: "rubric",
         priority: 50,
@@ -143,10 +143,10 @@ describe("mock executor", () => {
     return {
       sideId: "left" as const,
       task: {
-        task_id: overrides.task_id ?? "default_boundary_001",
+        task_id: overrides.task_id ?? "functional_scope_001",
         task_version: 1,
         family: "default",
-        category: overrides.category ?? "boundary_clarity",
+        category: overrides.category ?? "scope_discipline",
         critical_regression: false,
         evaluator_kind: (overrides.evaluator_kind ?? "rubric") as "rubric" | "deterministic",
         priority: 50,
@@ -258,32 +258,32 @@ describe("mock executor", () => {
 
   it("scores different task categories using appropriate cues", async () => {
     const bundleDir = makeBundleDir(
-      "# Skill\nlean minimal replace accumulate bloat sharp evidence verify"
+      "# Skill\nconflict resolution evidence hypothesis investigation ownership handoff output context routing action"
     );
     try {
       const executor = createMockExecutor();
 
-      const hygieneInput = makeTask({
-        task_id: "hygiene_bloat_001",
-        category: "code_hygiene",
-        prompt_text: "Review the library for bloat and replace discipline.",
-        rubric_text: "0 bloated\n4 sharp and minimal"
+      const investigationInput = makeTask({
+        task_id: "functional_investigation_001",
+        category: "structured_reasoning",
+        prompt_text: "Investigate a production issue with structured hypotheses.",
+        rubric_text: "0 no investigation\n4 comprehensive investigation with evidence"
       });
-      hygieneInput.bundleDir = bundleDir;
-      const hygieneResult = await executor.run(hygieneInput);
-      expect(hygieneResult.status).toBe("valid");
-      expect(hygieneResult.normalizedScore).toBeGreaterThan(0);
+      investigationInput.bundleDir = bundleDir;
+      const investigationResult = await executor.run(investigationInput);
+      expect(investigationResult.status).toBe("valid");
+      expect(investigationResult.normalizedScore).toBeGreaterThan(0);
 
-      const reviewInput = makeTask({
-        task_id: "default_review_001",
-        category: "review_quality",
-        prompt_text: "Review the library for evidence and verification.",
-        rubric_text: "0 no evidence\n4 strong evidence"
+      const handoffInput = makeTask({
+        task_id: "functional_handoff_001",
+        category: "handoff_quality",
+        prompt_text: "Produce a handoff artifact with ownership and context.",
+        rubric_text: "0 no handoff\n4 durable handoff artifact"
       });
-      reviewInput.bundleDir = bundleDir;
-      const reviewResult = await executor.run(reviewInput);
-      expect(reviewResult.status).toBe("valid");
-      expect(reviewResult.normalizedScore).toBeGreaterThan(0);
+      handoffInput.bundleDir = bundleDir;
+      const handoffResult = await executor.run(handoffInput);
+      expect(handoffResult.status).toBe("valid");
+      expect(handoffResult.normalizedScore).toBeGreaterThan(0);
     } finally {
       fs.rmSync(bundleDir, { recursive: true, force: true });
     }

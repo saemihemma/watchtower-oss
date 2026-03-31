@@ -173,7 +173,7 @@ export async function runBatch(config: BatchConfig): Promise<BatchResult> {
 /**
  * Estimate the cost of a batch based on executor type and run count.
  *
- * Codex: ~$0.01 per comparison (14 tasks per run default)
+ * Codex: ~$0.01 per comparison (8 tasks per run default)
  * Mock: $0.00 (for testing)
  * Claude: Estimated based on token counts (future)
  *

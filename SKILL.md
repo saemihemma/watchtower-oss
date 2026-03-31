@@ -16,34 +16,48 @@ Trigger on requests like:
 - did my cleanup make the library worse
 - compare this local folder against a GitHub repo
 - should I replace the old library with the new one
+- how does my library score against bare LLM (baseline-empty)
 
-## What It Does
+## Profiles
 
-- Compares exactly two sources
-- Runs the generic default benchmark profile against both sides
-- Returns winner, scores, confidence, reasons, regressions, Devil's Advocate review, and recommended action
-- Supports local paths and GitHub sources
-- Can replace the losing side with the winner only for decisive same-library runs with a local replacement target
+| Profile | What it tests |
+|---------|---------------|
+| `default` | Process discipline: routing, scope, evidence, handoff |
+| `grounded` | Objective accuracy with known correct answers |
+| `friction` | Simplicity — skills don't over-complicate simple work |
+| `library-quality` | Documentation quality |
 
-## What It Does Not Do
+Use `default` unless the user specifies otherwise. Use `composite` to score across all profiles at once.
 
-- It is not a web workflow
-- It does not merge individual skills
-- It does not benchmark arbitrary code repositories
-- It does not treat cross-library wins as drop-in replacement-safe
+## Commands
 
-## Source Formats
+```bash
+npm install && npm run build
+```
 
-Either side may be:
+```bash
+# Compare two libraries (default profile, mock executor)
+npm run watchtower -- compare "./lib-a" "./lib-b" --scenario head_to_head --executor mock
 
-- a local path
-- `github://owner/repo`
-- `github://owner/repo@branch`
-- `github://owner/repo#commit`
-- `https://github.com/owner/repo`
-- `https://github.com/owner/repo/tree/branch`
+# Compare against bare LLM baseline
+npm run watchtower -- compare "./my-library" "./baseline-empty" --executor mock
 
-Every source must contain at least one `SKILL.md` somewhere in the tree.
+# Composite score across all profiles
+npm run watchtower -- composite "./lib-a" "./lib-b" --executor mock
+
+# Real evaluation (uses Claude subscription)
+npm run watchtower -- compare "./lib-a" "./lib-b" --executor claude --scenario head_to_head
+
+# Show a stored run
+npm run watchtower -- show <run-id>
+
+# Leaderboard and history
+npm run watchtower -- leaderboard
+npm run watchtower -- history --limit 10
+
+# Replace losing side with winner
+npm run watchtower -- replace <run-id> --winner-to <left|right> --confirm
+```
 
 ## Scenario Selection
 
@@ -55,53 +69,6 @@ Use the user's intent to choose a scenario:
 - `add_new_skill`: adding one or more skills to an existing library
 - `regression_check`: cleanup or simplification validation
 - `projection_compare`: different projections of similar content
-
-If the scenario implies the comparison is the same library, use that instead of manually adding `--same-library`.
-
-## Profile Selection
-
-Use `default`.
-
-## Commands
-
-Install first:
-
-```bash
-npm install
-```
-
-List profiles and diagnostics:
-
-```bash
-npm run watchtower -- profiles
-```
-
-Compare two sources:
-
-```bash
-npm run watchtower -- compare "<left>" "<right>" --scenario <scenario> --profile default --executor mock
-```
-
-Use `--executor codex` or `--executor claude` for real evaluations once the matching launch command is configured.
-
-Show a stored run:
-
-```bash
-npm run watchtower -- show <run-id>
-```
-
-Show leaderboard or history:
-
-```bash
-npm run watchtower -- leaderboard
-npm run watchtower -- history --limit 10
-```
-
-Replace the losing side with the winner:
-
-```bash
-npm run watchtower -- replace <run-id> --winner-to <left|right> --confirm
-```
 
 ## Result Presentation
 
@@ -118,16 +85,9 @@ When reporting a run, cover:
 
 If the run includes the v2 stats payload, summarize the ROPE verdict, confidence interval, and probability of right-side superiority.
 
-## Replacement Rules
-
-- Only offer replacement for same-library runs
-- Do not recommend replacement when confidence is low
-- Do not recommend replacement when regressions remain
-- GitHub-backed sources can be benchmarked but not overwritten
-- Cross-library comparisons should end in `keep separate` or `port ideas deliberately`
-
 ## Boundaries
 
 - Mock runs are useful for development, not final irreversible decisions
 - Real runs require `WATCHTOWER_CODEX_LAUNCH` or `WATCHTOWER_CLAUDE_LAUNCH`
-- Replacement is archive-first and whole-root only
+- Only offer replacement for same-library runs with decisive results
+- GitHub-backed sources can be benchmarked but not overwritten

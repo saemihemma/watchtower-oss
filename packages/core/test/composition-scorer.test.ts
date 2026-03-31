@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { detectCollapse, createCompositionScorer, enrichCompositionMetadata } from "../src/composition-scorer.js";
+import { createCompositionScorer, enrichCompositionMetadata } from "../src/composition-scorer.js";
 import { clearBundleTextCache } from "../src/cv-scorer.js";
 import { registerExtensionScorer, clearExtensionScorers } from "../src/extension-scorer.js";
 import type { BenchmarkTask, ExecutorInput, ExecutorOutput } from "../src/schemas.js";
@@ -7,75 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// ---------------------------------------------------------------------------
-// Collapse detection tests (8)
-// ---------------------------------------------------------------------------
-
-describe("detectCollapse", () => {
-  // Test 1: Clear collapse
-  it("detects clear collapse (high prim, low comp)", () => {
-    const result = detectCollapse([0.8, 0.7], [0.2, 0.1]);
-    expect(result.detected).toBe(true);
-    expect(result.severity).toBeCloseTo(0.789, 2);
-    expect(result.mean_primitive).toBeCloseTo(0.75, 2);
-    expect(result.mean_composed).toBeCloseTo(0.15, 2);
-  });
-
-  // Test 2: No collapse (both high)
-  it("returns no collapse when both layers high", () => {
-    const result = detectCollapse([0.8, 0.7], [0.7, 0.6]);
-    expect(result.detected).toBe(false);
-    expect(result.severity).toBe(0);
-  });
-
-  // Test 3: No collapse (both low)
-  it("returns no collapse when both layers low", () => {
-    const result = detectCollapse([0.3, 0.2], [0.1, 0.1]);
-    expect(result.detected).toBe(false);
-    expect(result.severity).toBe(0);
-  });
-
-  // Test 4: Boundary (prim=0.6 exactly → NOT > 0.6)
-  it("does not detect collapse at exact floor boundary", () => {
-    const result = detectCollapse([0.6], [0.2]);
-    expect(result.detected).toBe(false);
-  });
-
-  // Test 5: Boundary (comp=0.3 exactly → NOT < 0.3)
-  it("does not detect collapse at exact ceiling boundary", () => {
-    const result = detectCollapse([0.8], [0.3]);
-    expect(result.detected).toBe(false);
-  });
-
-  // Test 6: Custom thresholds
-  it("uses custom thresholds", () => {
-    const result = detectCollapse([0.55], [0.35], {
-      primitive_floor: 0.5,
-      composed_ceiling: 0.4,
-    });
-    expect(result.detected).toBe(true);
-  });
-
-  // Test 7: Near-threshold
-  it("detects collapse at near-threshold values", () => {
-    const result = detectCollapse([0.61], [0.29]);
-    expect(result.detected).toBe(true);
-    // severity = (0.61 - 0.29) / (0.61 + 0.01) = 0.32 / 0.62 ≈ 0.516
-    expect(result.severity).toBeCloseTo(0.516, 2);
-  });
-
-  // Test 8: Severity at zero prim (guard)
-  it("returns severity 0 when primitives very low", () => {
-    // Even if detected would be true with very low thresholds, severity guarded
-    const result = detectCollapse([0.05], [0.01], {
-      primitive_floor: 0.04,
-      composed_ceiling: 0.02,
-    });
-    // 0.05 > 0.04 AND 0.01 < 0.02 → detected=true, but meanPrim < 0.1 → severity=0
-    expect(result.detected).toBe(true);
-    expect(result.severity).toBe(0);
-  });
-});
+// detectCollapse tests are in collapse-boundary.test.ts (16 oracle + edge cases)
 
 // ---------------------------------------------------------------------------
 // Composition scorer tests (5)

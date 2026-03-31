@@ -5,6 +5,8 @@ import {
   MAX_CATEGORY_REASONS,
   MAX_REASONS,
   MEDIUM_CONFIDENCE_MAX_FAIL_RATE,
+  TOKEN_TAX_BASELINE,
+  TOKEN_TAX_CAP,
   UNSTABLE_SCORE_RANGE,
   WINNER_DELTA_THRESHOLD
 } from "./constants.js";
@@ -371,4 +373,25 @@ export function computeDevilsAdvocate(
         : "caution",
     arguments: argumentsList.slice(0, MAX_REASONS)
   };
+}
+
+/**
+ * Apply token tax: penalize scores when output is excessively verbose.
+ * Tokens at or below baseline incur no penalty.
+ * Each token above baseline reduces score by 0.01 (1%), capped at TOKEN_TAX_CAP.
+ *
+ * Returns the adjusted score (on the same 0–1 scale as input).
+ * If tokenCount is undefined or null, returns rawScore unchanged.
+ */
+export function applyTokenTax(
+  rawScore: number,
+  tokenCount: number | undefined | null,
+  baseline: number = TOKEN_TAX_BASELINE,
+  cap: number = TOKEN_TAX_CAP
+): number {
+  if (tokenCount == null || tokenCount <= baseline) {
+    return rawScore;
+  }
+  const penalty = 0.0001 * (tokenCount - baseline);
+  return rawScore * Math.max(1 - penalty, 1 - cap);
 }

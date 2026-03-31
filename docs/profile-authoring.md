@@ -83,7 +83,7 @@ Every category referenced by a task must have a weight. Categories with a weight
 
 ### extends_default
 
-When `true`, your profile starts with all 14 default tasks and 7 default category weights, then applies your customizations on top. Use this when you want the default evaluation plus your additions.
+When `true`, your profile starts with all 8 default process-discipline tasks and 3 default category weights (structured_reasoning 35, scope_discipline 35, handoff_quality 30), then applies your customizations on top. Use this when you want the default evaluation plus your additions.
 
 When `false` (default), your profile is standalone — only your tasks and weights are used.
 
@@ -91,9 +91,9 @@ When `false` (default), your profile is standalone — only your tasks and weigh
 
 Only meaningful when `extends_default: true`. These remove inherited tasks before your custom tasks are added.
 
-`exclude_tasks` takes exact task IDs: `["default_usage_001", "default_handoff_002"]`.
+`exclude_tasks` takes exact task IDs: `["functional_multidomain_001", "functional_routing_001"]`.
 
-`exclude_categories` takes category names: `["constraint_handling", "routing_accuracy"]`. This removes all tasks in those categories and drops the corresponding weight.
+`exclude_categories` takes category names: `["scope_discipline", "handoff_quality"]`. This removes all tasks in those categories and drops the corresponding weight.
 
 Use `exclude_categories` to remove entire dimensions you don't care about. Use `exclude_tasks` to surgically remove individual tests while keeping the rest of the category.
 
@@ -138,7 +138,7 @@ Include 4–8 keywords that are likely to appear in a high-quality skill library
 Run only architecture and hygiene checks:
 
 ```bash
-npm run watchtower -- compare ./a ./b --categories system_architecture,code_hygiene
+npm run watchtower -- compare ./a ./b --categories structured_reasoning,scope_discipline
 ```
 
 Or as a profile file:
@@ -149,7 +149,7 @@ Or as a profile file:
   "label": "Architecture and Hygiene",
   "description": "Focused on system structure and code cleanliness.",
   "extends_default": true,
-  "exclude_categories": ["routing_accuracy", "boundary_clarity", "review_quality", "handoff_quality", "constraint_handling"],
+  "exclude_categories": ["structured_reasoning", "scope_discipline"],
   "category_weights": {},
   "tasks": []
 }

@@ -78,6 +78,30 @@ function createNoSkillRoot(): string {
   return root;
 }
 
+/** Default process-discipline task IDs in the new default profile. */
+const DEFAULT_TASK_IDS = [
+  "functional_multidomain_001",
+  "functional_investigation_001",
+  "functional_scope_001",
+  "functional_scope_002",
+  "functional_handoff_001",
+  "functional_handoff_002",
+  "functional_handoff_003",
+  "functional_routing_001"
+];
+
+/** Library-quality task IDs. */
+const LIBRARY_QUALITY_TASK_IDS = [
+  "libqual_usage_001",
+  "libqual_discovery_001",
+  "libqual_boundary_001",
+  "libqual_boundary_002",
+  "libqual_review_001",
+  "libqual_review_002",
+  "libqual_handoff_001",
+  "libqual_handoff_002"
+];
+
 function createMappedExecutor(
   mapping: Record<string, { left: number; right: number; leftFailedTrials?: number; rightFailedTrials?: number }>
 ): Executor {
@@ -104,6 +128,20 @@ function createMappedExecutor(
   };
 }
 
+/** Build a mapping where all provided task IDs get the same left/right scores. */
+function uniformMapping(
+  taskIds: string[],
+  left: number,
+  right: number,
+  opts?: { leftFailedTrials?: number; rightFailedTrials?: number }
+): Record<string, { left: number; right: number; leftFailedTrials?: number; rightFailedTrials?: number }> {
+  const mapping: Record<string, { left: number; right: number; leftFailedTrials?: number; rightFailedTrials?: number }> = {};
+  for (const id of taskIds) {
+    mapping[id] = { left, right, ...opts };
+  }
+  return mapping;
+}
+
 afterEach(() => {
   for (const root of tempRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
@@ -123,16 +161,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     expect(run.profile_id).toBe("default");
@@ -156,41 +185,11 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 },
-        arch_structure_001: { left: 0.25, right: 1 },
-        arch_composition_001: { left: 0.25, right: 1 },
-        hygiene_bloat_001: { left: 0.25, right: 1 },
-        hygiene_replace_001: { left: 0.25, right: 1 },
-        constraint_ambiguity_001: { left: 0.25, right: 1 },
-        constraint_partial_001: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     expect(run.profile_id).toBe("default");
-    expect(run.selected_task_ids).toEqual([
-      "default_usage_001",
-      "default_discovery_001",
-      "default_boundary_001",
-      "default_boundary_002",
-      "default_review_001",
-      "default_review_002",
-      "default_handoff_001",
-      "default_handoff_002",
-      "arch_structure_001",
-      "arch_composition_001",
-      "hygiene_bloat_001",
-      "hygiene_replace_001",
-      "constraint_ambiguity_001",
-      "constraint_partial_001"
-    ]);
+    expect(run.selected_task_ids).toEqual(DEFAULT_TASK_IDS);
   });
 
   it("returns too_close_to_call when the score delta is below threshold", async () => {
@@ -205,16 +204,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.5, right: 0.5 },
-        default_discovery_001: { left: 0.5, right: 0.5 },
-        default_boundary_001: { left: 0.5, right: 0.5 },
-        default_boundary_002: { left: 0.5, right: 0.5 },
-        default_review_001: { left: 0.5, right: 0.5 },
-        default_review_002: { left: 0.5, right: 0.5 },
-        default_handoff_001: { left: 0.5, right: 0.5 },
-        default_handoff_002: { left: 0.5, right: 0.5 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.5, 0.5))
     });
 
     expect(run.winner).toBe("too_close_to_call");
@@ -233,16 +223,9 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_discovery_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_boundary_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_review_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_review_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 },
-        default_handoff_002: { left: 0.25, right: 1, leftFailedTrials: 1, rightFailedTrials: 1 }
-      })
+      executor: createMappedExecutor(
+        uniformMapping(DEFAULT_TASK_IDS, 0.25, 1, { leftFailedTrials: 1, rightFailedTrials: 1 })
+      )
     });
 
     expect(run.scorecard.confidence).toBe("medium");
@@ -262,16 +245,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     expect(() => replaceFromRun(dataRoot, run.run_id, "left", true)).toThrow(/cross-library comparisons/);
@@ -289,16 +263,9 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_discovery_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_boundary_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_boundary_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_review_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_review_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_handoff_001: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 },
-        default_handoff_002: { left: 0.25, right: 1, leftFailedTrials: 2, rightFailedTrials: 2 }
-      })
+      executor: createMappedExecutor(
+        uniformMapping(DEFAULT_TASK_IDS, 0.25, 1, { leftFailedTrials: 2, rightFailedTrials: 2 })
+      )
     });
 
     expect(run.replace_eligible).toBe(false);
@@ -317,16 +284,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     const runPath = path.join(dataRoot, "runs", `${run.run_id}.json`);
@@ -353,16 +311,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "same_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     const result = replaceFromRun(dataRoot, run.run_id, "left", true);
@@ -386,16 +335,7 @@ describe("watchtower benchmark core", () => {
       comparisonMode: "cross_library",
       allowlistedParentRoot: os.tmpdir(),
       dataRoot,
-      executor: createMappedExecutor({
-        default_usage_001: { left: 0.25, right: 1 },
-        default_discovery_001: { left: 0.25, right: 1 },
-        default_boundary_001: { left: 0.25, right: 1 },
-        default_boundary_002: { left: 0.25, right: 1 },
-        default_review_001: { left: 0.25, right: 1 },
-        default_review_002: { left: 0.25, right: 1 },
-        default_handoff_001: { left: 0.25, right: 1 },
-        default_handoff_002: { left: 0.25, right: 1 }
-      })
+      executor: createMappedExecutor(uniformMapping(DEFAULT_TASK_IDS, 0.25, 1))
     });
 
     const shown = showRun(dataRoot, run.run_id);
@@ -428,13 +368,154 @@ describe("watchtower benchmark core", () => {
     ).rejects.toThrow(/No SKILL.md files were found/);
   });
 
-  it("lists the bundled benchmark profiles", () => {
+  it("lists all bundled benchmark profiles", () => {
     const profiles = listProfiles();
-    expect(profiles.map((profile) => profile.profile_id)).toEqual(["default"]);
+    const ids = profiles.map((profile) => profile.profile_id);
+    expect(ids).toContain("default");
+    expect(ids).toContain("library-quality");
+    expect(ids).toContain("friction");
+    expect(ids).toContain("grounded");
   });
 
-  it("keeps only the default profile available", () => {
+  it("retrieves the default and named profiles", () => {
     expect(getBenchmarkProfile("default").profile_id).toBe("default");
-    expect(() => getBenchmarkProfile("specialized-profile")).toThrow(/Unknown Watchtower profile/);
+    expect(getBenchmarkProfile("library-quality").profile_id).toBe("library-quality");
+    expect(getBenchmarkProfile("friction").profile_id).toBe("friction");
+    expect(getBenchmarkProfile("grounded").profile_id).toBe("grounded");
+    expect(() => getBenchmarkProfile("nonexistent-profile")).toThrow(/Unknown Watchtower profile/);
+  });
+
+  it("runs the library-quality profile with legacy task IDs", async () => {
+    const leftRoot = createSkillLibrary("lq-left", "weak");
+    const rightRoot = createSkillLibrary("lq-right", "strong");
+    const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
+    tempRoots.push(dataRoot);
+
+    const run = await compareLibrariesRun({
+      leftRootPath: leftRoot,
+      rightRootPath: rightRoot,
+      comparisonMode: "cross_library",
+      allowlistedParentRoot: os.tmpdir(),
+      dataRoot,
+      profileId: "library-quality",
+      executor: createMappedExecutor(uniformMapping(LIBRARY_QUALITY_TASK_IDS, 0.25, 1))
+    });
+
+    expect(run.profile_id).toBe("library-quality");
+    expect(run.selected_task_ids).toEqual(LIBRARY_QUALITY_TASK_IDS);
+    expect(run.winner).toBe("right");
+  });
+
+  it("runs the friction profile", async () => {
+    const leftRoot = createSkillLibrary("friction-left", "weak");
+    const rightRoot = createSkillLibrary("friction-right", "strong");
+    const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
+    tempRoots.push(dataRoot);
+
+    const frictionTaskIds = ["friction_email_001", "friction_commit_001", "friction_explain_001"];
+    const run = await compareLibrariesRun({
+      leftRootPath: leftRoot,
+      rightRootPath: rightRoot,
+      comparisonMode: "cross_library",
+      allowlistedParentRoot: os.tmpdir(),
+      dataRoot,
+      profileId: "friction",
+      executor: createMappedExecutor(uniformMapping(frictionTaskIds, 0.75, 0.75))
+    });
+
+    expect(run.profile_id).toBe("friction");
+    expect(run.selected_task_ids).toEqual(frictionTaskIds);
+  });
+
+  it("runs the grounded verification profile", async () => {
+    const leftRoot = createSkillLibrary("grounded-left", "weak");
+    const rightRoot = createSkillLibrary("grounded-right", "strong");
+    const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
+    tempRoots.push(dataRoot);
+
+    const groundedTaskIds = [
+      "grounded_logic_001",
+      "grounded_causal_001",
+      "grounded_debug_001",
+      "grounded_review_001"
+    ];
+    const run = await compareLibrariesRun({
+      leftRootPath: leftRoot,
+      rightRootPath: rightRoot,
+      comparisonMode: "cross_library",
+      allowlistedParentRoot: os.tmpdir(),
+      dataRoot,
+      profileId: "grounded",
+      executor: createMappedExecutor(uniformMapping(groundedTaskIds, 0.5, 1))
+    });
+
+    expect(run.profile_id).toBe("grounded");
+    expect(run.selected_task_ids).toEqual(groundedTaskIds);
+    expect(run.winner).toBe("right");
+  });
+
+  it("grounded profile tasks carry expected_answer for deterministic scoring", () => {
+    const profile = getBenchmarkProfile("grounded");
+    const answers = profile.tasks.map((t) => ({ id: t.task_id, answer: t.expected_answer, kind: t.evaluator_kind }));
+
+    for (const { id, answer, kind } of answers) {
+      expect(kind).toBe("deterministic");
+      expect(answer).toBeDefined();
+      expect(typeof answer).toBe("string");
+      expect((answer as string).length).toBeGreaterThan(0);
+    }
+
+    // Verify specific expected answers
+    const logic = profile.tasks.find((t) => t.task_id === "grounded_logic_001");
+    expect(logic?.expected_answer).toBe("FALLACY");
+    const review = profile.tasks.find((t) => t.task_id === "grounded_review_001");
+    expect(review?.expected_answer).toBe("BUG_FOUND");
+  });
+
+  it("supports two-phase executor with perform and judge", async () => {
+    const leftRoot = createSkillLibrary("twophase-left", "weak");
+    const rightRoot = createSkillLibrary("twophase-right", "strong");
+    const dataRoot = path.join(os.tmpdir(), `watchtower-data-${Date.now()}`);
+    tempRoots.push(dataRoot);
+
+    const twoPhaseExecutor: Executor = {
+      version: "test-twophase-v1",
+      async run(input) {
+        // Fallback for tasks without rubric (should not be called for rubric tasks in two-phase)
+        return { normalizedScore: 0.5, status: "valid", falsePositive: 0 };
+      },
+      async perform(input) {
+        const text = input.sideId === "left" ? "weak output" : "strong output with evidence and structure";
+        return { text, tokenCount: input.sideId === "left" ? 200 : 500 };
+      },
+      async judge(input) {
+        // Always give higher score to the output with "evidence" (which is the right/strong side)
+        const aHasEvidence = input.outputA.includes("evidence");
+        return {
+          aScore: aHasEvidence ? 0.9 : 0.3,
+          bScore: aHasEvidence ? 0.3 : 0.9,
+          reasoning: "Output with evidence and structure is better."
+        };
+      }
+    };
+
+    const run = await compareLibrariesRun({
+      leftRootPath: leftRoot,
+      rightRootPath: rightRoot,
+      comparisonMode: "cross_library",
+      allowlistedParentRoot: os.tmpdir(),
+      dataRoot,
+      executor: twoPhaseExecutor
+    });
+
+    expect(run.winner).toBe("right");
+    // Verify two-phase trial results exist for both sides
+    const leftTrials = run.task_trial_results.filter((r) => r.side_id === "left");
+    const rightTrials = run.task_trial_results.filter((r) => r.side_id === "right");
+    expect(leftTrials.length).toBeGreaterThan(0);
+    expect(rightTrials.length).toBeGreaterThan(0);
+    // Verify token counts are captured
+    expect(leftTrials.some((r) => r.token_count != null)).toBe(true);
+    expect(rightTrials.some((r) => r.token_count != null)).toBe(true);
   });
 });

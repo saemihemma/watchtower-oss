@@ -106,6 +106,22 @@ export const COLLAPSE_PRIMITIVE_FLOOR = 0.6;
 /** Composed score ceiling below which collapse is detected (when primitives above floor). */
 export const COLLAPSE_COMPOSED_CEILING = 0.3;
 
+// --- Token tax (verdict.ts) ---
+
+/** Token count below which no penalty is applied. */
+export const TOKEN_TAX_BASELINE = 800;
+
+/** Maximum score penalty fraction (0–1). Score cannot be reduced below (1 - cap) × raw. */
+export const TOKEN_TAX_CAP = 0.5;
+
+/** Maximum token delta considered for efficiency scoring. */
+export const TOKEN_COST_DELTA_MAX = 2000;
+
+// --- Randomization (engine.ts) ---
+
+/** Default seed for prompt template randomization. */
+export const DEFAULT_RANDOMIZATION_SEED = 42;
+
 // --- Batch runner (batch-runner.ts) ---
 
 /** Maximum parallel batch runs (file system contention + LLM API rate limits). */

@@ -144,7 +144,7 @@ describe("buildProfileFromExternal", () => {
     expect(profile.tasks.length).toBe(defaultProfile.tasks.length + 1);
     expect(profile.pack.category_weights.security).toBe(20);
     // Should inherit default weights
-    expect(profile.pack.category_weights.routing_accuracy).toBe(17);
+    expect(profile.pack.category_weights.structured_reasoning).toBe(35);
   });
 
   it("overrides default tasks when extending", () => {
@@ -156,15 +156,15 @@ describe("buildProfileFromExternal", () => {
       category_weights: {},
       tasks: [
         {
-          task_id: "default_usage_001",
-          category: "routing_accuracy",
-          prompt_text: "CUSTOM prompt for usage"
+          task_id: "functional_multidomain_001",
+          category: "structured_reasoning",
+          prompt_text: "CUSTOM prompt for multidomain"
         }
       ]
     };
     const profile = buildProfileFromExternal(def);
-    const overriddenTask = profile.tasks.find((t) => t.task_id === "default_usage_001");
-    expect(overriddenTask?.prompt_text).toBe("CUSTOM prompt for usage");
+    const overriddenTask = profile.tasks.find((t) => t.task_id === "functional_multidomain_001");
+    expect(overriddenTask?.prompt_text).toBe("CUSTOM prompt for multidomain");
   });
 
   it("throws when task category has no weight", () => {
@@ -250,11 +250,11 @@ describe("loadProfileFromFile", () => {
 describe("subsetProfileByCategories", () => {
   it("subsets the default profile to specific categories", () => {
     const full = getBenchmarkProfile("default");
-    const subset = subsetProfileByCategories(full, ["code_hygiene", "system_architecture"]);
+    const subset = subsetProfileByCategories(full, ["structured_reasoning", "scope_discipline"]);
 
-    expect(subset.tasks.every((t) => t.category === "code_hygiene" || t.category === "system_architecture")).toBe(true);
+    expect(subset.tasks.every((t) => t.category === "structured_reasoning" || t.category === "scope_discipline")).toBe(true);
     expect(Object.keys(subset.pack.category_weights)).toEqual(
-      expect.arrayContaining(["code_hygiene", "system_architecture"])
+      expect.arrayContaining(["structured_reasoning", "scope_discipline"])
     );
     expect(Object.keys(subset.pack.category_weights)).toHaveLength(2);
     expect(subset.profile_id).toContain("subset");
@@ -267,9 +267,9 @@ describe("subsetProfileByCategories", () => {
 
   it("preserves critical regression flags", () => {
     const full = getBenchmarkProfile("default");
-    const subset = subsetProfileByCategories(full, ["code_hygiene"]);
-    // hygiene_bloat_001 is critical
-    expect(subset.pack.critical_task_ids).toContain("hygiene_bloat_001");
+    const subset = subsetProfileByCategories(full, ["structured_reasoning"]);
+    // functional_investigation_001 is critical
+    expect(subset.pack.critical_task_ids).toContain("functional_investigation_001");
   });
 });
 
@@ -341,54 +341,54 @@ describe("exclude_tasks and exclude_categories", () => {
       extends_default: true,
       category_weights: {},
       tasks: [],
-      exclude_tasks: ["default_usage_001", "default_discovery_001"]
+      exclude_tasks: ["functional_multidomain_001", "functional_investigation_001"]
     };
     const profile = buildProfileFromExternal(def);
     const taskIds = profile.tasks.map((t) => t.task_id);
-    expect(taskIds).not.toContain("default_usage_001");
-    expect(taskIds).not.toContain("default_discovery_001");
+    expect(taskIds).not.toContain("functional_multidomain_001");
+    expect(taskIds).not.toContain("functional_investigation_001");
     // Other tasks should still be there
-    expect(taskIds).toContain("default_boundary_001");
-    expect(taskIds).toContain("default_review_001");
+    expect(taskIds).toContain("functional_scope_001");
+    expect(taskIds).toContain("functional_handoff_001");
   });
 
   it("excludes entire categories when extending default", () => {
     const def: ExternalProfileDefinition = {
-      profile_id: "no-constraints",
-      label: "No Constraints",
-      description: "Default minus constraint_handling.",
+      profile_id: "no-scope",
+      label: "No Scope",
+      description: "Default minus scope_discipline.",
       extends_default: true,
       category_weights: {},
       tasks: [],
-      exclude_categories: ["constraint_handling"]
+      exclude_categories: ["scope_discipline"]
     };
     const profile = buildProfileFromExternal(def);
     const categories = new Set(profile.tasks.map((t) => t.category));
-    expect(categories.has("constraint_handling")).toBe(false);
-    // Constraint weight should also be removed
-    expect("constraint_handling" in profile.pack.category_weights).toBe(false);
+    expect(categories.has("scope_discipline")).toBe(false);
+    // Scope weight should also be removed
+    expect("scope_discipline" in profile.pack.category_weights).toBe(false);
     // Other categories preserved
-    expect(categories.has("review_quality")).toBe(true);
+    expect(categories.has("structured_reasoning")).toBe(true);
   });
 
   it("combines task and category exclusion", () => {
     const def: ExternalProfileDefinition = {
       profile_id: "focused",
       label: "Focused",
-      description: "Only architecture and hygiene, minus bloat task.",
+      description: "Only handoff, minus routing task.",
       extends_default: true,
       category_weights: {},
       tasks: [],
-      exclude_categories: ["routing_accuracy", "boundary_clarity", "review_quality", "handoff_quality", "constraint_handling"],
-      exclude_tasks: ["hygiene_bloat_001"]
+      exclude_categories: ["structured_reasoning", "scope_discipline"],
+      exclude_tasks: ["functional_routing_001"]
     };
     const profile = buildProfileFromExternal(def);
     const taskIds = profile.tasks.map((t) => t.task_id);
-    // Should only have arch + hygiene_replace_001
-    expect(taskIds).toContain("arch_structure_001");
-    expect(taskIds).toContain("arch_composition_001");
-    expect(taskIds).toContain("hygiene_replace_001");
-    expect(taskIds).not.toContain("hygiene_bloat_001");
+    // Should only have handoff tasks minus routing
+    expect(taskIds).toContain("functional_handoff_001");
+    expect(taskIds).toContain("functional_handoff_002");
+    expect(taskIds).toContain("functional_handoff_003");
+    expect(taskIds).not.toContain("functional_routing_001");
     expect(taskIds.length).toBe(3);
   });
 
@@ -399,8 +399,8 @@ describe("exclude_tasks and exclude_categories", () => {
       description: "Standalone profile ignores exclude fields.",
       category_weights: { foo: 100 },
       tasks: [{ task_id: "t1", category: "foo", prompt_text: "X" }],
-      exclude_tasks: ["default_usage_001"],
-      exclude_categories: ["routing_accuracy"]
+      exclude_tasks: ["functional_multidomain_001"],
+      exclude_categories: ["structured_reasoning"]
     };
     const profile = buildProfileFromExternal(def);
     expect(profile.tasks).toHaveLength(1);

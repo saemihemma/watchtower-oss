@@ -1,4 +1,5 @@
 export * from "./builtin-benchmark.js";
+export * from "./composite.js";
 export * from "./composition-dag.js";
 export * from "./composition-scorer.js";
 export * from "./constants.js";

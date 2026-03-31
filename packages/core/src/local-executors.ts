@@ -108,15 +108,21 @@ function extractTextCues(text: string, minimumLength = 4, limit = 8): string[] {
   return [...new Set(tokens)].slice(0, limit);
 }
 
-/** Built-in cue mappings for default profile task ID prefixes. */
+/** Built-in cue mappings for profile task ID patterns. */
 const BUILTIN_CUE_TABLE: Array<{ match: (id: string) => boolean; cues: string[] }> = [
-  { match: (id) => id.includes("usage") || id.includes("discovery"), cues: ["use", "best", "discover", "overlap"] },
-  { match: (id) => id.includes("boundary"), cues: ["boundary", "scope", "overlap", "responsibilities"] },
-  { match: (id) => id.includes("review"), cues: ["evidence", "verify", "acceptance", "examples", "steps"] },
-  { match: (id) => id.includes("handoff"), cues: ["handoff", "output", "context", "next", "action"] },
-  { match: (id) => id.includes("arch_"), cues: ["structure", "layer", "compose", "dependency", "delegate", "ownership"] },
-  { match: (id) => id.includes("hygiene_"), cues: ["lean", "bloat", "replace", "accumulate", "minimal", "sharp"] },
-  { match: (id) => id.includes("constraint_"), cues: ["ambiguous", "partial", "degrade", "fallback", "missing", "graceful"] }
+  // Process-discipline (default profile)
+  { match: (id) => id.includes("multidomain") || id.includes("investigation"), cues: ["conflict", "resolution", "evidence", "hypothesis", "investigation", "ownership"] },
+  { match: (id) => id.includes("scope"), cues: ["scope", "defer", "constraint", "boundary", "trade-off", "priority"] },
+  { match: (id) => id.includes("handoff") || id.includes("routing"), cues: ["handoff", "output", "context", "next", "action", "ownership", "routing"] },
+  // Library-quality profile
+  { match: (id) => id.includes("libqual_usage") || id.includes("libqual_discovery"), cues: ["use", "best", "discover", "overlap"] },
+  { match: (id) => id.includes("libqual_boundary"), cues: ["boundary", "scope", "overlap", "responsibilities"] },
+  { match: (id) => id.includes("libqual_review"), cues: ["evidence", "verify", "acceptance", "examples", "steps"] },
+  { match: (id) => id.includes("libqual_handoff"), cues: ["handoff", "output", "context", "next", "action"] },
+  // Friction profile
+  { match: (id) => id.includes("friction"), cues: ["simple", "concise", "proportional", "clean", "crisp"] },
+  // Grounded profile
+  { match: (id) => id.includes("grounded"), cues: ["correct", "answer", "logic", "causal", "bug", "error"] }
 ];
 
 function taskCueSet(input: ExecutorInput): string[] {
